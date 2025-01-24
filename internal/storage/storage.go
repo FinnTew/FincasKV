@@ -22,7 +22,7 @@ type MemIndex[KeyType comparable, ValueType any] interface {
 
 type MemCache[KeyType comparable, ValueType any] interface {
 	Insert(key KeyType, value ValueType) error
-	Get(key KeyType) (ValueType, error)
-	Remove(key KeyType) error
-	Contains(key KeyType) bool
+	Find(key KeyType) (ValueType, error)
+	Delete(key KeyType) error
+	Exist(key KeyType) bool
 }

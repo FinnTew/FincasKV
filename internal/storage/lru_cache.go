@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"log"
 )
 
 type LRUCache[K comparable, V any] struct {
@@ -17,28 +18,29 @@ func NewLRUCache[K comparable, V any](size int) *LRUCache[K, V] {
 }
 
 func (c *LRUCache[K, V]) Insert(key K, value V) error {
-	if c.Add(key, value) {
-		return nil
-	}
-	return fmt.Errorf("cannot insert value [%v] into LRU cache", value)
-}
-
-func (c *LRUCache[K, V]) Get(key K) (V, error) {
-	value, err := c.Get(key)
-	var zero V
-	if err != nil {
-		return zero, err
-	}
-	return value, nil
-}
-
-func (c *LRUCache[K, V]) Remove(key K) error {
-	if err := c.Remove(key); err != nil {
-		return fmt.Errorf("cannot remove value [%v] into LRU cache: %v", key, err)
+	evicted := c.Add(key, value)
+	if evicted {
+		log.Printf("LRUCache: evicted when insert {key=%v value=%v}", key, value)
 	}
 	return nil
 }
 
-func (c *LRUCache[K, V]) Contains(key K) bool {
+func (c *LRUCache[K, V]) Find(key K) (V, error) {
+	value, exist := c.Get(key)
+	var zero V
+	if !exist {
+		return zero, fmt.Errorf("cannot find value [%v] into LRU cache", key)
+	}
+	return value, nil
+}
+
+func (c *LRUCache[K, V]) Delete(key K) error {
+	if present := c.Remove(key); !present {
+		return fmt.Errorf("cannot find value [%v] into LRU cache", key)
+	}
+	return nil
+}
+
+func (c *LRUCache[K, V]) Exist(key K) bool {
 	return c.Contains(key)
 }
