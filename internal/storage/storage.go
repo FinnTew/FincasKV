@@ -1,5 +1,16 @@
 package storage
 
+var (
+	FilePrefix = "data-"
+	FileSuffix = ".flog"
+	// HeaderSize 记录头部大小: timestamp(8) + flags(4) + keyLen(4) + valueLen(4) = 20 bytes
+	HeaderSize = 20
+	// MaxKeySize 键最大长度 32MB
+	MaxKeySize = 32 << 20
+	// MaxValueSize 值最大长度 32MB
+	MaxValueSize = 32 << 20
+)
+
 type Storage[KeyType comparable, ValueType any] interface {
 	Open(opts ...Options) (Storage[KeyType, ValueType], error)
 	Put(key KeyType, value ValueType) error
