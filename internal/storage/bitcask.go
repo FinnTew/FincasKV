@@ -1,5 +1,7 @@
 package storage
 
-type Bitcask[K comparable, V any] struct {
-	// TODO: add fields
+type Bitcask struct {
+	fm       FileManager
+	memIndex MemIndexShard[string, Entry]
+	memCache MemCache[string, []byte]
 }
