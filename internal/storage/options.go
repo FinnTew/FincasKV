@@ -40,3 +40,33 @@ func DefaultOptions() *Options {
 		// TODO: add more default options here
 	}
 }
+
+func WithMemIndexDS(memIndexDS MemIndexType) Option {
+	return func(opt *Options) {
+		opt.MemIndexDS = memIndexDS
+	}
+}
+
+func WithBTreeDegree(bTreeDegree int) Option {
+	return func(opt *Options) {
+		opt.BTreeDegree = bTreeDegree
+	}
+}
+
+func WithSkipListRandSource(skipListRandSource rand.Source) Option {
+	return func(opt *Options) {
+		opt.SkipListRandSource = skipListRandSource
+	}
+}
+
+func WithOpenMemCache(openMemCache bool) Option {
+	return func(opt *Options) {
+		opt.OpenMemCache = openMemCache
+	}
+}
+
+func WithMemCacheSize(memCacheSize int) Option {
+	return func(opt *Options) {
+		opt.MemCacheSize = memCacheSize
+	}
+}
