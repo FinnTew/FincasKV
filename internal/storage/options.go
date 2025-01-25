@@ -4,6 +4,7 @@ import (
 	"github.com/FinnTew/FincasKV/util"
 	"log"
 	"math/rand"
+	"time"
 )
 
 type MemIndexType int
@@ -22,6 +23,11 @@ type Options struct {
 	// 内存缓存相关
 	OpenMemCache bool // 是否开启内存缓存
 	MemCacheSize int  // 内存缓存大小
+
+	// 文件管理器相关
+	MaxFileSize  int64         // 每个文件的最大大小
+	MaxOpenFiles int           // 最大打开文件数
+	SyncInterval time.Duration // 同步间隔
 
 	// TODO: add config options here
 }
