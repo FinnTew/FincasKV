@@ -11,21 +11,21 @@ const (
 	probability = 0.25
 )
 
-type CompareFunc[K any] func(a, b K) int
+type SkipListLessFunc[K comparable] func(a, b K) int
 
-type node[K any, V any] struct {
+type node[K comparable, V any] struct {
 	key   K
 	value V
 	next  []*node[K, V]
 }
 
-type SkipListIndex[K any, V any] struct {
+type SkipListIndex[K comparable, V any] struct {
 	head    *node[K, V]
 	level   int
 	size    int
 	lock    sync.RWMutex
 	rand    *rand.Rand
-	compare CompareFunc[K]
+	compare SkipListLessFunc[K]
 }
 
 type SkipListOption func(interface{})
@@ -38,7 +38,7 @@ func WithRandSource(source rand.Source) SkipListOption {
 	}
 }
 
-func NewSkipListIndex[K any, V any](compare CompareFunc[K], opts ...SkipListOption) *SkipListIndex[K, V] {
+func NewSkipListIndex[K comparable, V any](compare SkipListLessFunc[K], opts ...SkipListOption) *SkipListIndex[K, V] {
 	if compare == nil {
 		panic("compare function cannot be nil")
 	}

@@ -6,10 +6,12 @@ import (
 	"sync"
 )
 
+type BTreeLessFunc[K comparable] func(a, b K) bool
+
 type Item[K comparable, V any] struct {
 	key   K
 	value V
-	less  func(a, b K) bool
+	less  BTreeLessFunc[K]
 }
 
 func (i *Item[K, V]) Less(than btree.Item) bool {
@@ -20,7 +22,7 @@ func (i *Item[K, V]) Less(than btree.Item) bool {
 type BTreeIndex[K comparable, V any] struct {
 	tree       *btree.BTree
 	lock       sync.RWMutex
-	comparator func(a, b K) bool
+	comparator BTreeLessFunc[K]
 }
 
 func NewBTreeIndex[K comparable, V any](degree int, less func(a, b K) bool) *BTreeIndex[K, V] {
