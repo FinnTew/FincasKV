@@ -85,9 +85,22 @@ func (s *MemIndexShard[K, V]) Foreach(f func(key K, value V) bool) error {
 	s.RLock()
 	defer s.RUnlock()
 	for _, shard := range s.shards {
-		err := shard.Foreach(f)
+		stop := false
+		err := shard.Foreach(func(key K, value V) bool {
+			if stop {
+				return false
+			}
+			if !f(key, value) {
+				stop = true
+				return false
+			}
+			return true
+		})
 		if err != nil {
 			return err
+		}
+		if stop {
+			break
 		}
 	}
 	return nil
@@ -96,11 +109,26 @@ func (s *MemIndexShard[K, V]) Foreach(f func(key K, value V) bool) error {
 func (s *MemIndexShard[K, V]) Clear() error {
 	s.Lock()
 	defer s.Unlock()
+
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(s.shards))
+	defer close(errChan)
+
 	for _, shard := range s.shards {
-		err := shard.Clear()
-		if err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func(s MemIndex[K, V]) {
+			defer wg.Done()
+			if err := s.Clear(); err != nil {
+				errChan <- err
+			}
+		}(shard)
 	}
-	return nil
+	wg.Wait()
+
+	select {
+	case err := <-errChan:
+		return fmt.Errorf("could not clear index: %w", err)
+	default:
+		return nil
+	}
 }

@@ -90,6 +90,19 @@ func TestMemIndexShard(t *testing.T) {
 					}
 				}
 			}
+
+			err := indexShard.Foreach(func(k int, v string) bool {
+				t.Logf("key: %d, value: %s", k, v)
+				return true
+			})
+			if err != nil {
+				t.Fatalf("Foreach() = %v; want no error", err)
+			}
+
+			err = indexShard.Clear()
+			if err != nil {
+				t.Fatalf("Clear() = %v; want no error", err)
+			}
 		})
 	}
 }
