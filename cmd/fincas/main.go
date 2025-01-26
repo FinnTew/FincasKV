@@ -13,6 +13,7 @@ func main() {
 		storage.WithDataDir("./data"),
 		storage.WithMaxFileSize(1<<30),  // 1GB
 		storage.WithMemCacheSize(1<<20), // 1MB
+		storage.WithMemIndexDS(storage.BTree),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -55,5 +56,10 @@ func main() {
 		} else {
 			fmt.Println(string(value))
 		}
+	}
+
+	err = db.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
