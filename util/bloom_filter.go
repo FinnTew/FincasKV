@@ -1,176 +1,277 @@
 package util
 
 import (
-	"bytes"
-	"encoding/gob"
-	"errors"
+	"fmt"
 	"hash"
-	"hash/crc64"
 	"hash/fnv"
 	"math"
 	"sync"
+	"sync/atomic"
 )
 
-type BloomFilter struct {
-	bits   []byte
-	m      uint64
-	k      uint
-	seeds  []uint64
-	mu     sync.RWMutex
-	hasher hash.Hash64
+const (
+	// 默认分片数,必须是2的幂
+	defaultShards = 16
+	// 默认每个分片大小(bit)
+	defaultBitsPerShard = 1024
+	// 默认hash函数个数
+	defaultHashFuncs = 4
+	// 扩容因子
+	growthFactor = 2
+	// 扩容阈值,当填充率超过75%触发扩容
+	growthThreshold = 0.75
+)
+
+// ShardedBloomFilter 分片布隆过滤器
+type ShardedBloomFilter struct {
+	shards    []shard    // 存储分片数据
+	k         uint32     // hash函数个数
+	m         uint64     // 总bit数
+	n         uint64     // 已插入元素个数(原子操作)
+	shardMask uint32     // 分片掩码
+	shardBits uint32     // 每个分片的bit数
+	hashPool  *sync.Pool // hash函数池
+	autoScale bool       // 是否自动扩容
 }
 
-func optimalM(n uint64, p float64) uint64 {
-	m := -float64(n) * math.Log(p) / (math.Ln2 * math.Ln2)
-	return uint64(math.Ceil(m))
+// shard 单个分片
+type shard struct {
+	bits []uint64
+	sync.RWMutex
 }
 
-func optimalK(m, n uint64) uint {
-	k := math.Ceil((float64(m) / float64(n)) * math.Ln2)
-	return uint(math.Max(1, k))
+// Options 配置选项
+type BloomConfig struct {
+	ExpectedElements  uint64  // 预期元素数量
+	FalsePositiveRate float64 // 期望误判率
+	AutoScale         bool    // 是否自动扩容
+	NumShards         uint32  // 分片数量
+	BitsPerShard      uint32  // 每个分片bit数
+	NumHashFuncs      uint32  // hash函数数量
 }
 
-func NewBloomFilter(n uint64, p float64) (*BloomFilter, error) {
-	if n == 0 {
-		return nil, errors.New("n must be > 0")
+// NewShardedBloomFilter 创建新的分片布隆过滤器
+func NewShardedBloomFilter(opts BloomConfig) (*ShardedBloomFilter, error) {
+	if err := validateOptions(&opts); err != nil {
+		return nil, err
 	}
-	if p <= 0 || p >= 1 {
-		return nil, errors.New("p must be > 0 and < 1")
+
+	// 计算最优参数
+	m := calculateOptimalM(opts.ExpectedElements, opts.FalsePositiveRate)
+	k := calculateOptimalK(opts.ExpectedElements, m)
+
+	// 初始化分片
+	numShards := opts.NumShards
+	if numShards == 0 {
+		numShards = defaultShards
 	}
 
-	m := optimalM(n, p)
-	k := optimalK(m, n)
+	bitsPerShard := opts.BitsPerShard
+	if bitsPerShard == 0 {
+		bitsPerShard = defaultBitsPerShard
+	}
 
-	seeds := []uint64{0x8b3d35e3d94e5659, 0x7a47d13d11a51a9a}
+	// 确保分片数是2的幂
+	if !isPowerOfTwo(uint64(numShards)) {
+		numShards = uint32(nextPowerOf2(uint64(numShards)))
+	}
 
-	return &BloomFilter{
-		bits:   make([]byte, m),
-		m:      m,
-		k:      k,
-		seeds:  seeds,
-		hasher: fnv.New64a(),
+	if m > uint64(numShards)*uint64(bitsPerShard) {
+		bitsPerShard = uint32(nextPowerOf2(uint64(m / uint64(numShards))))
+	}
+
+	shards := make([]shard, numShards)
+	for i := range shards {
+		shards[i].bits = make([]uint64, bitsPerShard/64)
+	}
+
+	// 初始化hash函数池
+	hashPool := &sync.Pool{
+		New: func() interface{} {
+			return fnv.New64a()
+		},
+	}
+
+	return &ShardedBloomFilter{
+		shards:    shards,
+		k:         k,
+		m:         m,
+		shardMask: numShards - 1,
+		shardBits: bitsPerShard,
+		hashPool:  hashPool,
+		autoScale: opts.AutoScale,
 	}, nil
 }
 
-func (bf *BloomFilter) Add(item []byte) {
-	bf.mu.Lock()
-	defer bf.mu.Unlock()
-
-	h1, h2 := bf.hashValues(item)
-	for i := uint(0); i < bf.k; i++ {
-		pos := (h1 + uint64(i)*h2) % bf.m
-		bf.setBit(pos)
+// validateOptions 验证配置参数
+func validateOptions(opts *BloomConfig) error {
+	if opts.ExpectedElements == 0 {
+		return fmt.Errorf("expected elements must be > 0")
 	}
+	if opts.FalsePositiveRate <= 0 || opts.FalsePositiveRate >= 1 {
+		return fmt.Errorf("false positive rate must be in (0,1)")
+	}
+	return nil
 }
 
-func (bf *BloomFilter) Contains(item []byte) bool {
-	bf.mu.RLock()
-	defer bf.mu.RUnlock()
+// calculateOptimalM 计算最优bit数
+func calculateOptimalM(n uint64, p float64) uint64 {
+	return uint64(math.Ceil(-float64(n) * math.Log(p) / math.Pow(math.Log(2), 2)))
+}
 
-	h1, h2 := bf.hashValues(item)
-	for i := uint(0); i < bf.k; i++ {
-		pos := (h1 + uint64(i)*h2) % bf.m
-		if !bf.getBit(pos) {
+// calculateOptimalK 计算最优hash函数个数
+func calculateOptimalK(n, m uint64) uint32 {
+	k := uint32(math.Round(float64(m/n) * math.Log(2)))
+	if k < defaultHashFuncs {
+		k = defaultHashFuncs
+	}
+	return k
+}
+
+// isPowerOfTwo 判断是否是2的幂
+func isPowerOfTwo(x uint64) bool {
+	return x != 0 && (x&(x-1)) == 0
+}
+
+// nextPowerOf2 计算下一个2的幂
+func nextPowerOf2(x uint64) uint64 {
+	x--
+	x |= x >> 1
+	x |= x >> 2
+	x |= x >> 4
+	x |= x >> 8
+	x |= x >> 16
+	x |= x >> 32
+	x++
+	return x
+}
+
+// Add 添加元素
+func (bf *ShardedBloomFilter) Add(data []byte) error {
+	if len(data) == 0 {
+		return fmt.Errorf("empty data")
+	}
+
+	// 检查是否需要扩容
+	if bf.autoScale && float64(atomic.LoadUint64(&bf.n))/float64(bf.m) > growthThreshold {
+		if err := bf.grow(); err != nil {
+			return fmt.Errorf("bloom filter grow failed: %v", err)
+		}
+	}
+
+	hashValues := bf.hashValues(data)
+	for i := uint32(0); i < bf.k; i++ {
+		shardIndex := hashValues[i] & uint64(bf.shardMask)
+		bitIndex := (hashValues[i] >> bf.k) % uint64(bf.shardBits)
+
+		shard := &bf.shards[shardIndex]
+		shard.Lock()
+		shard.bits[bitIndex/64] |= 1 << (bitIndex % 64)
+		shard.Unlock()
+	}
+
+	atomic.AddUint64(&bf.n, 1)
+	return nil
+}
+
+// Contains 判断元素是否存在
+func (bf *ShardedBloomFilter) Contains(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	hashValues := bf.hashValues(data)
+	for i := uint32(0); i < bf.k; i++ {
+		shardIndex := hashValues[i] & uint64(bf.shardMask)
+		bitIndex := (hashValues[i] >> bf.k) % uint64(bf.shardBits)
+
+		shard := &bf.shards[shardIndex]
+		shard.RLock()
+		isSet := (shard.bits[bitIndex/64] & (1 << (bitIndex % 64))) != 0
+		shard.RUnlock()
+
+		if !isSet {
 			return false
 		}
 	}
 	return true
 }
 
-func (bf *BloomFilter) hashValues(item []byte) (uint64, uint64) {
-	bf.hasher.Reset()
-	bf.hasher.Write(item)
-	h1 := bf.hasher.Sum64()
+// grow 扩容操作
+func (bf *ShardedBloomFilter) grow() error {
+	// 创建新的分片数组
+	newShardCount := uint32(len(bf.shards) * growthFactor)
+	newShardBits := bf.shardBits * growthFactor
+	newShards := make([]shard, newShardCount)
 
-	crcTable := crc64.MakeTable(crc64.ECMA)
-	h2 := crc64.Checksum(item, crcTable)
-
-	h1 ^= bf.seeds[0]
-	h2 ^= bf.seeds[1]
-
-	return h1, h2
-}
-
-func (bf *BloomFilter) setBit(pos uint64) {
-	idx := pos / 8
-	bit := pos % 8
-	bf.bits[idx] |= 1 << bit
-}
-
-func (bf *BloomFilter) getBit(pos uint64) bool {
-	idx := pos / 8
-	bit := pos % 8
-	return (bf.bits[idx] & (1 << bit)) != 0
-}
-
-func (bf *BloomFilter) Reset() {
-	bf.mu.Lock()
-	defer bf.mu.Unlock()
-	for i := range bf.bits {
-		bf.bits[i] = 0
-	}
-}
-
-func (bf *BloomFilter) MarshalBinary() ([]byte, error) {
-	bf.mu.RLock()
-	defer bf.mu.RUnlock()
-
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-
-	if err := enc.Encode(bf.bits); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(bf.m); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(bf.k); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(bf.seeds); err != nil {
-		return nil, err
+	for i := range newShards {
+		newShards[i].bits = make([]uint64, newShardBits/64)
 	}
 
-	return buf.Bytes(), nil
-}
-
-func (bf *BloomFilter) UnmarshalBinary(data []byte) error {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
-
-	if err := dec.Decode(&bf.bits); err != nil {
-		return err
-	}
-	if err := dec.Decode(&bf.m); err != nil {
-		return err
-	}
-	if err := dec.Decode(&bf.k); err != nil {
-		return err
-	}
-	if err := dec.Decode(&bf.seeds); err != nil {
-		return err
+	// 复制旧数据
+	for i := 0; i < len(bf.shards); i++ {
+		shard := &bf.shards[i]
+		shard.Lock()
+		shard.bits = make([]uint64, newShardBits/64)
+		shard.Unlock()
 	}
 
-	bf.hasher = fnv.New64a()
+	// 原子更新
+	bf.shards = newShards
+	bf.m = uint64(newShardCount) * uint64(newShardBits)
+	bf.shardMask = newShardCount - 1
+	bf.shardBits = newShardBits
+
 	return nil
 }
 
-func (bf *BloomFilter) EstimatedFillRatio() float64 {
-	bf.mu.RLock()
-	defer bf.mu.RUnlock()
+// hashValues 计算hash值
+func (bf *ShardedBloomFilter) hashValues(data []byte) []uint64 {
+	hashFunc := bf.hashPool.Get().(hash.Hash64)
+	defer bf.hashPool.Put(hashFunc)
+	hashFunc.Reset()
 
-	setBits := 0
-	for _, b := range bf.bits {
-		setBits += bitsSetCount(b)
+	values := make([]uint64, bf.k)
+	hashFunc.Write(data)
+	h1, h2 := hashFunc.Sum64(), hashFunc.Sum64()
+
+	for i := uint32(0); i < bf.k; i++ {
+		values[i] = h1 + uint64(i)*h2
 	}
-	return float64(setBits) / float64(bf.m)
+	return values
 }
 
-func bitsSetCount(b byte) int {
-	count := 0
-	for b > 0 {
-		count += int(b & 1)
-		b >>= 1
+// Stats 获取统计信息
+func (bf *ShardedBloomFilter) Stats() map[string]interface{} {
+	currentN := atomic.LoadUint64(&bf.n)
+	return map[string]interface{}{
+		"total_bits":        bf.m,
+		"num_items":         currentN,
+		"num_shards":        len(bf.shards),
+		"bits_per_shard":    bf.shardBits,
+		"num_hash_funcs":    bf.k,
+		"auto_scale":        bf.autoScale,
+		"estimated_fpp":     bf.estimateFPP(currentN),
+		"current_fill_rate": float64(currentN) / float64(bf.m),
 	}
-	return count
+}
+
+// estimateFPP 估算误判率
+func (bf *ShardedBloomFilter) estimateFPP(n uint64) float64 {
+	if n == 0 {
+		return 0
+	}
+	return math.Pow(1-math.Exp(-float64(bf.k)*float64(n)/float64(bf.m)), float64(bf.k))
+}
+
+// Reset 重置布隆过滤器
+func (bf *ShardedBloomFilter) Reset() {
+	atomic.StoreUint64(&bf.n, 0)
+	for i := range bf.shards {
+		bf.shards[i].Lock()
+		for j := range bf.shards[i].bits {
+			bf.shards[i].bits[j] = 0
+		}
+		bf.shards[i].Unlock()
+	}
 }

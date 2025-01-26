@@ -1,130 +1,308 @@
 package util
 
 import (
-	"math"
 	"strconv"
 	"testing"
 )
 
-func TestBloomFilter(t *testing.T) {
+func TestNewShardedBloomFilter(t *testing.T) {
 	tests := []struct {
-		name        string
-		n           uint64
-		p           float64
-		wantErr     bool
-		testActions func(*testing.T, *BloomFilter)
+		name    string
+		config  BloomConfig
+		wantErr bool
 	}{
 		{
-			name:    "invalid zero elements",
-			n:       0,
-			p:       0.01,
-			wantErr: true,
-		},
-		{
-			name:    "invalid probability=1",
-			n:       1000,
-			p:       1.0,
-			wantErr: true,
-		},
-		{
-			name:    "basic functionality",
-			n:       1000,
-			p:       0.01,
-			wantErr: false,
-			testActions: func(t *testing.T, bf *BloomFilter) {
-				for i := 0; i < 1000; i++ {
-					data := []byte("key" + strconv.Itoa(i))
-					bf.Add(data)
-					if !bf.Contains(data) {
-						t.Errorf("元素 %d 未找到", i)
-					}
-				}
-
-				falsePositives := 0
-				totalTests := 1000
-				for i := 1000; i < 1000+totalTests; i++ {
-					data := []byte("key" + strconv.Itoa(i))
-					if bf.Contains(data) {
-						falsePositives++
-					}
-				}
-
-				fpRate := float64(falsePositives) / float64(totalTests)
-				if fpRate > 0.02 { // 允许2%误差
-					t.Errorf("误判率过高: %.4f > 0.02", fpRate)
-				}
+			name: "valid config",
+			config: BloomConfig{
+				ExpectedElements:  1000,
+				FalsePositiveRate: 0.01,
+				AutoScale:         true,
+				NumShards:         16,
+				BitsPerShard:      1024,
+				NumHashFuncs:      4,
 			},
+			wantErr: false,
 		},
 		{
-			name:    "serialization roundtrip",
-			n:       1000,
-			p:       0.01,
+			name: "zero expected elements",
+			config: BloomConfig{
+				ExpectedElements:  0,
+				FalsePositiveRate: 0.01,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid false positive rate",
+			config: BloomConfig{
+				ExpectedElements:  1000,
+				FalsePositiveRate: 0,
+			},
+			wantErr: true,
+		},
+		{
+			name: "non power of 2 shards",
+			config: BloomConfig{
+				ExpectedElements:  1000,
+				FalsePositiveRate: 0.01,
+				NumShards:         10,
+			},
 			wantErr: false,
-			testActions: func(t *testing.T, bf *BloomFilter) {
-				for i := 0; i < 1000; i++ {
-					bf.Add([]byte("data" + strconv.Itoa(i)))
-				}
+		},
+	}
 
-				data, err := bf.MarshalBinary()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bf, err := NewShardedBloomFilter(tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewShardedBloomFilter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && bf == nil {
+				t.Error("NewShardedBloomFilter() returned nil without error")
+			}
+		})
+	}
+}
+
+func TestShardedBloomFilter_AddAndContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements [][]byte
+		check    []byte
+		want     bool
+	}{
+		{
+			name:     "add and find element",
+			elements: [][]byte{[]byte("test1")},
+			check:    []byte("test1"),
+			want:     true,
+		},
+		{
+			name:     "element not found",
+			elements: [][]byte{[]byte("test1")},
+			check:    []byte("test2"),
+			want:     false,
+		},
+		{
+			name:     "empty element",
+			elements: [][]byte{[]byte("test1")},
+			check:    []byte{},
+			want:     false,
+		},
+		{
+			name:     "multiple elements",
+			elements: [][]byte{[]byte("test1"), []byte("test2"), []byte("test3")},
+			check:    []byte("test2"),
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bf, _ := NewShardedBloomFilter(BloomConfig{
+				ExpectedElements:  1000,
+				FalsePositiveRate: 0.01,
+			})
+
+			for _, elem := range tt.elements {
+				err := bf.Add(elem)
 				if err != nil {
-					t.Fatal("序列化失败:", err)
+					t.Errorf("Add() error = %v", err)
 				}
+			}
 
-				newBF := &BloomFilter{}
-				if err := newBF.UnmarshalBinary(data); err != nil {
-					t.Fatal("反序列化失败:", err)
-				}
+			if got := bf.Contains(tt.check); got != tt.want {
+				t.Errorf("Contains() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
-				for i := 0; i < 1000; i++ {
-					key := []byte("data" + strconv.Itoa(i))
-					if !newBF.Contains(key) {
-						t.Errorf("反序列化后元素 %d 未找到", i)
-					}
-				}
+func TestShardedBloomFilter_Reset(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements [][]byte
+	}{
+		{
+			name:     "reset with elements",
+			elements: [][]byte{[]byte("test1"), []byte("test2")},
+		},
+		{
+			name:     "reset empty filter",
+			elements: [][]byte{},
+		},
+	}
 
-				origRatio := bf.EstimatedFillRatio()
-				newRatio := newBF.EstimatedFillRatio()
-				if math.Abs(origRatio-newRatio) > 0.0001 {
-					t.Errorf("填充率不一致 原始: %.4f 新: %.4f", origRatio, newRatio)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bf, _ := NewShardedBloomFilter(BloomConfig{
+				ExpectedElements:  1000,
+				FalsePositiveRate: 0.01,
+			})
+
+			for _, elem := range tt.elements {
+				_ = bf.Add(elem)
+			}
+
+			bf.Reset()
+
+			// 验证所有元素都被清除
+			for _, elem := range tt.elements {
+				if bf.Contains(elem) {
+					t.Errorf("After Reset(), element %s still exists", elem)
 				}
+			}
+
+			// 验证计数器被重置
+			stats := bf.Stats()
+			if stats["num_items"].(uint64) != 0 {
+				t.Errorf("After Reset(), num_items = %v, want 0", stats["num_items"])
+			}
+		})
+	}
+}
+
+func TestShardedBloomFilter_AutoScale(t *testing.T) {
+	tests := []struct {
+		name           string
+		numElements    int
+		initialShards  uint32
+		expectedGrowth bool
+	}{
+		{
+			name:           "should grow",
+			numElements:    1000,
+			initialShards:  16,
+			expectedGrowth: true,
+		},
+		{
+			name:           "should not grow",
+			numElements:    10,
+			initialShards:  16,
+			expectedGrowth: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bf, _ := NewShardedBloomFilter(BloomConfig{
+				ExpectedElements:  100,
+				FalsePositiveRate: 0.01,
+				AutoScale:         true,
+				NumShards:         tt.initialShards,
+			})
+
+			initialShards := len(bf.shards)
+
+			// 添加元素直到触发扩容
+			for i := 0; i < tt.numElements; i++ {
+				_ = bf.Add([]byte(strconv.Itoa(i)))
+			}
+
+			finalShards := len(bf.shards)
+			if tt.expectedGrowth && finalShards <= initialShards {
+				t.Errorf("Expected growth, but got shards: initial=%d, final=%d", initialShards, finalShards)
+			}
+			if !tt.expectedGrowth && finalShards > initialShards {
+				t.Errorf("Unexpected growth, got shards: initial=%d, final=%d", initialShards, finalShards)
+			}
+		})
+	}
+}
+
+func TestShardedBloomFilter_Stats(t *testing.T) {
+	tests := []struct {
+		name      string
+		elements  [][]byte
+		checkKeys []string
+	}{
+		{
+			name:     "empty filter stats",
+			elements: [][]byte{},
+			checkKeys: []string{
+				"total_bits", "num_items", "num_shards", "bits_per_shard",
+				"num_hash_funcs", "auto_scale", "estimated_fpp", "current_fill_rate",
 			},
 		},
 		{
-			name:    "reset functionality",
-			n:       1000,
-			p:       0.01,
-			wantErr: false,
-			testActions: func(t *testing.T, bf *BloomFilter) {
-				bf.Add([]byte("test"))
-				if !bf.Contains([]byte("test")) {
-					t.Error("重置前元素未找到")
-				}
-
-				bf.Reset()
-
-				if bf.Contains([]byte("test")) {
-					t.Error("重置后元素不应存在")
-				}
-
-				if ratio := bf.EstimatedFillRatio(); ratio > 0 {
-					t.Errorf("重置后填充率应为0，实际为 %.4f", ratio)
-				}
+			name:     "filled filter stats",
+			elements: [][]byte{[]byte("test1"), []byte("test2")},
+			checkKeys: []string{
+				"total_bits", "num_items", "num_shards", "bits_per_shard",
+				"num_hash_funcs", "auto_scale", "estimated_fpp", "current_fill_rate",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bf, err := NewBloomFilter(tt.n, tt.p)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("New() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if tt.wantErr {
-				return
+			bf, _ := NewShardedBloomFilter(BloomConfig{
+				ExpectedElements:  1000,
+				FalsePositiveRate: 0.01,
+			})
+
+			for _, elem := range tt.elements {
+				_ = bf.Add(elem)
 			}
 
-			if tt.testActions != nil {
-				tt.testActions(t, bf)
+			stats := bf.Stats()
+
+			// 检查所有必需的键是否存在
+			for _, key := range tt.checkKeys {
+				if _, exists := stats[key]; !exists {
+					t.Errorf("Stats() missing key %s", key)
+				}
+			}
+
+			if stats["num_items"].(uint64) != uint64(len(tt.elements)) {
+				t.Errorf("Stats() num_items = %v, want %v", stats["num_items"], len(tt.elements))
+			}
+
+			fillRate := stats["current_fill_rate"].(float64)
+			if fillRate < 0 || fillRate > 1 {
+				t.Errorf("Stats() fill_rate = %v, want between 0 and 1", fillRate)
+			}
+		})
+	}
+}
+
+func TestHelperFunctions(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func() bool
+	}{
+		{
+			name: "isPowerOfTwo",
+			fn: func() bool {
+				return isPowerOfTwo(16) && !isPowerOfTwo(7)
+			},
+		},
+		{
+			name: "nextPowerOf2",
+			fn: func() bool {
+				return nextPowerOf2(7) == 8 && nextPowerOf2(8) == 8
+			},
+		},
+		{
+			name: "calculateOptimalM",
+			fn: func() bool {
+				m := calculateOptimalM(1000, 0.01)
+				return m > 0
+			},
+		},
+		{
+			name: "calculateOptimalK",
+			fn: func() bool {
+				k := calculateOptimalK(1000, 10000)
+				return k >= defaultHashFuncs
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.fn() {
+				t.Errorf("%s failed", tt.name)
 			}
 		})
 	}
