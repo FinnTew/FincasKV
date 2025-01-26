@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/FinnTew/FincasKV/util"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,10 +20,14 @@ const (
 
 // Bitcask 实现
 type Bitcask struct {
-	cfg      *Options
-	fm       *FileManager
+	cfg *Options
+
+	fm *FileManager
+
 	memIndex *MemIndexShard[string, Entry]
 	memCache MemCache[string, []byte]
+
+	filter *util.ShardedBloomFilter
 
 	mergeRunning  atomic.Bool
 	mergeTicker   *time.Ticker
@@ -71,11 +76,21 @@ func Open(options ...Option) (*Bitcask, error) {
 		}
 	}
 
+	filter, err := util.NewShardedBloomFilter(util.BloomConfig{
+		ExpectedElements:  1 << 10,
+		FalsePositiveRate: 0.01,
+		AutoScale:         true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create filter failed: %w", err)
+	}
+
 	db := &Bitcask{
 		cfg:           cfg,
 		fm:            fm,
 		memIndex:      memIndex,
 		memCache:      memCache,
+		filter:        filter,
 		mergeStopChan: make(chan struct{}),
 	}
 
@@ -226,6 +241,11 @@ func (db *Bitcask) Put(key string, value []byte) error {
 		}
 	}
 
+	// 更新布隆过滤器
+	if db.filter != nil {
+		_ = db.filter.Add(record.Key)
+	}
+
 	return nil
 }
 
@@ -241,7 +261,14 @@ func (db *Bitcask) Get(key string) ([]byte, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	// 先查内存缓存
+	// 检查布隆过滤器
+	if db.filter != nil {
+		if !db.filter.Contains([]byte(key)) {
+			return nil, ErrKeyNotFound
+		}
+	}
+
+	// 检查内存缓存
 	if db.memCache != nil {
 		if value, err := db.memCache.Find(key); err == nil {
 			return value, nil
@@ -286,8 +313,13 @@ func (db *Bitcask) Del(key string) error {
 	defer db.mu.Unlock()
 
 	// 先检查键是否存在
-	if _, err := db.memIndex.Get(key); err != nil {
-		return ErrKeyNotFound
+	//if _, err := db.memIndex.Get(key); err != nil {
+	//	return ErrKeyNotFound
+	//}
+	if db.filter != nil {
+		if !db.filter.Contains([]byte(key)) {
+			return ErrKeyNotFound
+		}
 	}
 
 	// 写入删除标记记录
