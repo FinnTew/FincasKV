@@ -21,10 +21,16 @@ const (
 )
 
 type Options struct {
+	// 基本配置
+	DataDir string
+
 	// 内存索引相关
-	MemIndexDS         MemIndexType // 内存索引数据结构
-	BTreeDegree        int          // B树的度
-	SkipListRandSource rand.Source  // 跳表的随机源
+	MemIndexDS         MemIndexType             // 内存索引数据结构
+	MemIndexShardCount int                      // 内存索引分片数量
+	BTreeDegree        int                      // B树的度
+	BTreeComparator    BTreeLessFunc[string]    // B树的比较器
+	SkipListRandSource rand.Source              // 跳表的随机源
+	SkipListComparator SkipListLessFunc[string] // 跳表的比较器
 
 	// 内存缓存相关
 	OpenMemCache bool         // 是否开启内存缓存
@@ -45,15 +51,35 @@ func DefaultOptions() *Options {
 		log.Panic("Get secure rand source failed: ", err)
 	}
 	return &Options{
+		DataDir:            "/tmp/fincas",
 		MemIndexDS:         SkipList,
+		MemIndexShardCount: 1 << 8,
 		BTreeDegree:        8,
+		BTreeComparator: func(a, b string) bool {
+			return a < b
+		},
 		SkipListRandSource: rand.New(source),
-		OpenMemCache:       true,
-		MemCacheDS:         LRU,
-		MemCacheSize:       1 << 10,
-		MaxFileSize:        1 << 30,
-		MaxOpenFiles:       10,
-		SyncInterval:       5 * time.Second,
+		SkipListComparator: func(a, b string) int {
+			if a < b {
+				return -1
+			} else if a > b {
+				return 1
+			} else {
+				return 0
+			}
+		},
+		OpenMemCache: true,
+		MemCacheDS:   LRU,
+		MemCacheSize: 1 << 10,
+		MaxFileSize:  1 << 30,
+		MaxOpenFiles: 10,
+		SyncInterval: 5 * time.Second,
+	}
+}
+
+func WithDataDir(dataDir string) Option {
+	return func(opt *Options) {
+		opt.DataDir = dataDir
 	}
 }
 
@@ -63,15 +89,33 @@ func WithMemIndexDS(memIndexDS MemIndexType) Option {
 	}
 }
 
+func WithMemIndexShardCount(memIndexShardCount int) Option {
+	return func(opt *Options) {
+		opt.MemIndexShardCount = memIndexShardCount
+	}
+}
+
 func WithBTreeDegree(bTreeDegree int) Option {
 	return func(opt *Options) {
 		opt.BTreeDegree = bTreeDegree
 	}
 }
 
+func WithBTreeComparator(bTreeComparator BTreeLessFunc[string]) Option {
+	return func(opt *Options) {
+		opt.BTreeComparator = bTreeComparator
+	}
+}
+
 func WithSkipListRandSource(skipListRandSource rand.Source) Option {
 	return func(opt *Options) {
 		opt.SkipListRandSource = skipListRandSource
+	}
+}
+
+func WithSkipListComparator(skipListComparator SkipListLessFunc[string]) Option {
+	return func(opt *Options) {
+		opt.SkipListComparator = skipListComparator
 	}
 }
 
