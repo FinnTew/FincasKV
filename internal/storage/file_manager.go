@@ -111,7 +111,7 @@ func (fm *FileManager) initialize() error {
 	if maxID > 0 {
 		// 重新打开旧的最大编号文件，用于后续追加
 		filePath := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", FilePrefix, maxID, FileSuffix))
-		file, err := os.OpenFile(filePath, os.O_RDWR|os.O_APPEND, 0644)
+		file, err := os.OpenFile(filePath, os.O_RDWR, 0644)
 		if err != nil {
 			return fmt.Errorf("open active file failed: %w", err)
 		}
@@ -342,7 +342,7 @@ func (fm *FileManager) getFile(fileID int) (*os.File, error) {
 	}
 
 	path := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", FilePrefix, fileID, FileSuffix))
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: fileID=%d", ErrFileNotFound, fileID)

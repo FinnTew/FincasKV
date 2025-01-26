@@ -41,6 +41,11 @@ type Options struct {
 	MaxFileSize  int64         // 每个文件的最大大小
 	MaxOpenFiles int           // 最大打开文件数
 	SyncInterval time.Duration // 同步间隔
+
+	// Merge 相关
+	AutoMerge     bool
+	MergeInterval time.Duration
+	MinMergeRatio float64
 }
 
 type Option func(opt *Options)
@@ -68,12 +73,15 @@ func DefaultOptions() *Options {
 				return 0
 			}
 		},
-		OpenMemCache: true,
-		MemCacheDS:   LRU,
-		MemCacheSize: 1 << 10,
-		MaxFileSize:  1 << 30,
-		MaxOpenFiles: 10,
-		SyncInterval: 5 * time.Second,
+		OpenMemCache:  true,
+		MemCacheDS:    LRU,
+		MemCacheSize:  1 << 10,
+		MaxFileSize:   1 << 30,
+		MaxOpenFiles:  10,
+		SyncInterval:  5 * time.Second,
+		AutoMerge:     true,
+		MergeInterval: time.Hour,
+		MinMergeRatio: 0.3,
 	}
 }
 
@@ -152,5 +160,23 @@ func WithMaxOpenFiles(maxOpenFiles int) Option {
 func WithSyncInterval(interval time.Duration) Option {
 	return func(opt *Options) {
 		opt.SyncInterval = interval
+	}
+}
+
+func WithAutoMerge(autoMerge bool) Option {
+	return func(opt *Options) {
+		opt.AutoMerge = autoMerge
+	}
+}
+
+func WithMergeInterval(interval time.Duration) Option {
+	return func(opt *Options) {
+		opt.MergeInterval = interval
+	}
+}
+
+func WithMinMergeRatio(minMergeRatio float64) Option {
+	return func(opt *Options) {
+		opt.MinMergeRatio = minMergeRatio
 	}
 }
