@@ -342,7 +342,7 @@ func (fm *FileManager) getFile(fileID int) (*os.File, error) {
 	}
 
 	path := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", FilePrefix, fileID, FileSuffix))
-	file, err := os.OpenFile(path, os.O_RDONLY, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: fileID=%d", ErrFileNotFound, fileID)
