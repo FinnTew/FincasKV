@@ -198,6 +198,9 @@ func (db *Bitcask) loadDataFile(fileID int) error {
 			if err := db.memIndex.Put(string(r.Key), entry); err != nil {
 				return fmt.Errorf("update index failed: %w", err)
 			}
+			if err := db.filter.Add(r.Key); err != nil {
+				return fmt.Errorf("update filter failed: %w", err)
+			}
 		}
 
 		offset += recordSize
