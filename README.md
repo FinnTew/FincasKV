@@ -10,10 +10,10 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [x] Basic Bitcask
   - [x] Async Write
   - [x] Merge Ticker
-  - [ ] Multi-Type-MemIndex
+  - [x] Multi-Type-MemIndex
     - [x] BTree
     - [x] SkipList
-    - [ ] SwissTable
+    - [x] SwissTable
   - [x] ShardMemIndex
   - [x] MemCache(implement LRUCache only)
   - [x] Use BloomFilter
