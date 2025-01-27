@@ -22,6 +22,7 @@ func NewMemIndexShard[K comparable, V any](
 	btreeLessFunc func(a, b K) bool,
 	skipListRandSource rand.Source,
 	skipListLessFunc func(a, b K) int,
+	swissTableSize uint32,
 ) *MemIndexShard[K, V] {
 	index := &MemIndexShard[K, V]{
 		shardCount: shardCount,
@@ -47,6 +48,11 @@ func NewMemIndexShard[K comparable, V any](
 			} else {
 				index.shards[i] = NewSkipListIndex[K, V](skipListLessFunc, WithRandSource(skipListRandSource))
 			}
+		case storage.SwissTable:
+			if swissTableSize <= 0 {
+				swissTableSize = 1 << 10
+			}
+			index.shards[i] = NewSwissIndex[K, V](swissTableSize)
 		default:
 			log.Fatal("Unsupported memIndex type")
 		}

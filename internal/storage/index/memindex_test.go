@@ -70,7 +70,7 @@ func TestMemIndexShard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			indexShard := NewMemIndexShard[int, string](tt.memIndexType, tt.shardCount, 2, btreeLessFunc, nil, skipListLessFunc)
+			indexShard := NewMemIndexShard[int, string](tt.memIndexType, tt.shardCount, 2, btreeLessFunc, nil, skipListLessFunc, 1<<10)
 
 			for _, op := range tt.operations {
 				switch op.op {

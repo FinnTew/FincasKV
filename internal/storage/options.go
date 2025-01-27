@@ -13,8 +13,9 @@ type SkipListLessFunc[K comparable] func(a, b K) int
 type MemIndexType string
 
 const (
-	BTree    MemIndexType = "btree"
-	SkipList MemIndexType = "skiplist"
+	BTree      MemIndexType = "btree"
+	SkipList   MemIndexType = "skiplist"
+	SwissTable MemIndexType = "swisstable"
 )
 
 type MemCacheType string
@@ -34,6 +35,7 @@ type Options struct {
 	BTreeComparator    BTreeLessFunc[string]    // B树的比较器
 	SkipListRandSource rand.Source              // 跳表的随机源
 	SkipListComparator SkipListLessFunc[string] // 跳表的比较器
+	SwissTableSize     uint32                   // SwissTable 的大小
 
 	// 内存缓存相关
 	OpenMemCache bool         // 是否开启内存缓存
@@ -60,7 +62,7 @@ func DefaultOptions() *Options {
 	}
 	return &Options{
 		DataDir:            "/tmp/fincas",
-		MemIndexDS:         SkipList,
+		MemIndexDS:         SwissTable,
 		MemIndexShardCount: 1 << 8,
 		BTreeDegree:        8,
 		BTreeComparator: func(a, b string) bool {
@@ -76,15 +78,16 @@ func DefaultOptions() *Options {
 				return 0
 			}
 		},
-		OpenMemCache:  true,
-		MemCacheDS:    LRU,
-		MemCacheSize:  1 << 10,
-		MaxFileSize:   1 << 30,
-		MaxOpenFiles:  10,
-		SyncInterval:  5 * time.Second,
-		AutoMerge:     true,
-		MergeInterval: time.Hour,
-		MinMergeRatio: 0.3,
+		SwissTableSize: 1 << 10,
+		OpenMemCache:   true,
+		MemCacheDS:     LRU,
+		MemCacheSize:   1 << 10,
+		MaxFileSize:    1 << 30,
+		MaxOpenFiles:   10,
+		SyncInterval:   5 * time.Second,
+		AutoMerge:      true,
+		MergeInterval:  time.Hour,
+		MinMergeRatio:  0.3,
 	}
 }
 
