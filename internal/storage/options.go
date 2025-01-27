@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+type BTreeLessFunc[K comparable] func(a, b K) bool
+type SkipListLessFunc[K comparable] func(a, b K) int
+
 type MemIndexType string
 
 const (

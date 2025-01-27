@@ -1,8 +1,13 @@
-package storage
+package bitcask
 
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/storage"
+	"github.com/FinnTew/FincasKV/internal/storage/cache"
+	"github.com/FinnTew/FincasKV/internal/storage/err_def"
+	"github.com/FinnTew/FincasKV/internal/storage/file_manager"
+	"github.com/FinnTew/FincasKV/internal/storage/index"
 	"github.com/FinnTew/FincasKV/util"
 	"io"
 	"os"
@@ -20,12 +25,12 @@ const (
 
 // Bitcask 实现
 type Bitcask struct {
-	cfg *Options
+	cfg *storage.Options
 
-	fm *FileManager
+	fm *file_manager.FileManager
 
-	memIndex *MemIndexShard[string, Entry]
-	memCache MemCache[string, []byte]
+	memIndex *index.MemIndexShard[string, storage.Entry]
+	memCache storage.MemCache[string, []byte]
 
 	filter *util.ShardedBloomFilter
 
@@ -38,15 +43,15 @@ type Bitcask struct {
 }
 
 // Open 打开或创建一个 Bitcask 实例
-func Open(options ...Option) (*Bitcask, error) {
+func Open(options ...storage.Option) (*Bitcask, error) {
 	// 初始化默认配置
-	cfg := DefaultOptions()
+	cfg := storage.DefaultOptions()
 	for _, opt := range options {
 		opt(cfg)
 	}
 
 	// 创建文件管理器
-	fm, err := NewFileManager(
+	fm, err := file_manager.NewFileManager(
 		cfg.DataDir,
 		cfg.MaxFileSize,
 		cfg.MaxOpenFiles,
@@ -57,7 +62,7 @@ func Open(options ...Option) (*Bitcask, error) {
 	}
 
 	// 创建内存索引
-	memIndex := NewMemIndexShard[string, Entry](
+	memIndex := index.NewMemIndexShard[string, storage.Entry](
 		cfg.MemIndexDS,
 		cfg.MemIndexShardCount,
 		cfg.BTreeDegree,
@@ -66,11 +71,11 @@ func Open(options ...Option) (*Bitcask, error) {
 		cfg.SkipListComparator,
 	)
 
-	var memCache MemCache[string, []byte]
+	var memCache storage.MemCache[string, []byte]
 	if cfg.OpenMemCache {
 		switch cfg.MemCacheDS {
-		case LRU:
-			memCache = NewLRUCache[string, []byte](cfg.MemCacheSize)
+		case storage.LRU:
+			memCache = cache.NewLRUCache[string, []byte](cfg.MemCacheSize)
 		default:
 			return nil, fmt.Errorf("unsopported memcache DS: %s", cfg.MemCacheDS)
 		}
@@ -118,7 +123,7 @@ func (db *Bitcask) loadDataFiles() error {
 	// 按文件ID排序处理
 	for _, file := range files {
 		var fileID int
-		_, err := fmt.Sscanf(file.Name(), FilePrefix+"%d"+FileSuffix, &fileID)
+		_, err := fmt.Sscanf(file.Name(), storage.FilePrefix+"%d"+storage.FileSuffix, &fileID)
 		if err != nil {
 			continue // 跳过不符合命名规则的文件
 		}
@@ -133,7 +138,7 @@ func (db *Bitcask) loadDataFiles() error {
 
 // loadDataFile 加载单个数据文件，重建索引
 func (db *Bitcask) loadDataFile(fileID int) error {
-	file, err := db.fm.getFile(fileID)
+	file, err := db.fm.GetFile(fileID)
 	if err != nil {
 		return err
 	}
@@ -141,7 +146,7 @@ func (db *Bitcask) loadDataFile(fileID int) error {
 	var offset int64
 	for {
 		// 读取头部信息
-		header := make([]byte, HeaderSize)
+		header := make([]byte, storage.HeaderSize)
 		n, err := file.ReadAt(header, offset)
 		if err != nil {
 			if err == io.EOF {
@@ -149,14 +154,14 @@ func (db *Bitcask) loadDataFile(fileID int) error {
 			}
 			return fmt.Errorf("read header failed: %w", err)
 		}
-		if n < HeaderSize {
+		if n < storage.HeaderSize {
 			break
 		}
 
 		// 解析头部
 		keyLen := binary.BigEndian.Uint32(header[12:16])
 		valueLen := binary.BigEndian.Uint32(header[16:20])
-		recordSize := int64(HeaderSize) + int64(keyLen) + int64(valueLen) + 8 // +8 for checksum
+		recordSize := int64(storage.HeaderSize) + int64(keyLen) + int64(valueLen) + 8 // +8 for checksum
 
 		// 读取完整记录
 		record := make([]byte, recordSize)
@@ -172,13 +177,13 @@ func (db *Bitcask) loadDataFile(fileID int) error {
 		}
 
 		// 解码记录
-		r, err := decodeRecord(record)
+		r, err := file_manager.DecodeRecord(record)
 		if err != nil {
 			return fmt.Errorf("decode record failed: %w", err)
 		}
 
 		// 更新内存索引
-		entry := Entry{
+		entry := storage.Entry{
 			FileID:    fileID,
 			Offset:    offset,
 			Size:      uint32(recordSize),
@@ -203,20 +208,20 @@ func (db *Bitcask) loadDataFile(fileID int) error {
 // Put 写入键值对
 func (db *Bitcask) Put(key string, value []byte) error {
 	if db.closed {
-		return ErrDBClosed
+		return err_def.ErrDBClosed
 	}
 	if len(key) == 0 {
-		return ErrEmptyKey
+		return err_def.ErrEmptyKey
 	}
 
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	// 构造记录并直接使用FileManager的异步写入
-	record := &Record{
+	record := &storage.Record{
 		Timestamp: time.Now().UnixNano(),
 		Flags:     FlagNormal,
-		KVItem: KVItem{
+		KVItem: storage.KVItem{
 			Key:   []byte(key),
 			Value: value,
 		},
@@ -252,10 +257,10 @@ func (db *Bitcask) Put(key string, value []byte) error {
 // Get 读取键值对
 func (db *Bitcask) Get(key string) ([]byte, error) {
 	if db.closed {
-		return nil, ErrDBClosed
+		return nil, err_def.ErrDBClosed
 	}
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 
 	db.mu.RLock()
@@ -264,7 +269,7 @@ func (db *Bitcask) Get(key string) ([]byte, error) {
 	// 检查布隆过滤器
 	if db.filter != nil {
 		if !db.filter.Contains([]byte(key)) {
-			return nil, ErrKeyNotFound
+			return nil, err_def.ErrKeyNotFound
 		}
 	}
 
@@ -278,7 +283,7 @@ func (db *Bitcask) Get(key string) ([]byte, error) {
 	// 查找内存索引
 	entry, err := db.memIndex.Get(key)
 	if err != nil {
-		return nil, ErrKeyNotFound
+		return nil, err_def.ErrKeyNotFound
 	}
 
 	// 直接使用FileManager的读取
@@ -289,7 +294,7 @@ func (db *Bitcask) Get(key string) ([]byte, error) {
 
 	// 检查删除标记
 	if record.Flags == FlagDeleted {
-		return nil, ErrKeyNotFound
+		return nil, err_def.ErrKeyNotFound
 	}
 
 	// 更新缓存
@@ -303,10 +308,10 @@ func (db *Bitcask) Get(key string) ([]byte, error) {
 // Del 删除键值对
 func (db *Bitcask) Del(key string) error {
 	if db.closed {
-		return ErrDBClosed
+		return err_def.ErrDBClosed
 	}
 	if len(key) == 0 {
-		return ErrEmptyKey
+		return err_def.ErrEmptyKey
 	}
 
 	db.mu.Lock()
@@ -318,15 +323,15 @@ func (db *Bitcask) Del(key string) error {
 	//}
 	if db.filter != nil {
 		if !db.filter.Contains([]byte(key)) {
-			return ErrKeyNotFound
+			return err_def.ErrKeyNotFound
 		}
 	}
 
 	// 写入删除标记记录
-	record := &Record{
+	record := &storage.Record{
 		Timestamp: time.Now().UnixNano(),
 		Flags:     FlagDeleted,
-		KVItem: KVItem{
+		KVItem: storage.KVItem{
 			Key:   []byte(key),
 			Value: nil,
 		},
@@ -355,14 +360,14 @@ func (db *Bitcask) Del(key string) error {
 // ListKeys 列出所有键
 func (db *Bitcask) ListKeys() ([]string, error) {
 	if db.closed {
-		return nil, ErrDBClosed
+		return nil, err_def.ErrDBClosed
 	}
 
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
 	var keys []string
-	err := db.memIndex.Foreach(func(key string, _ Entry) bool {
+	err := db.memIndex.Foreach(func(key string, _ storage.Entry) bool {
 		keys = append(keys, key)
 		return true
 	})
@@ -377,13 +382,13 @@ func (db *Bitcask) ListKeys() ([]string, error) {
 // Fold 遍历所有键值对
 func (db *Bitcask) Fold(f func(key string, value []byte) bool) error {
 	if db.closed {
-		return ErrDBClosed
+		return err_def.ErrDBClosed
 	}
 
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	return db.memIndex.Foreach(func(key string, entry Entry) bool {
+	return db.memIndex.Foreach(func(key string, entry storage.Entry) bool {
 		record, err := db.fm.Read(entry)
 		if err != nil {
 			return false
@@ -398,7 +403,7 @@ func (db *Bitcask) Fold(f func(key string, value []byte) bool) error {
 // Merge 合并数据文件，删除无效记录
 func (db *Bitcask) Merge() error {
 	if db.closed {
-		return ErrDBClosed
+		return err_def.ErrDBClosed
 	}
 
 	if !db.mergeRunning.CompareAndSwap(false, true) {
@@ -416,7 +421,7 @@ func (db *Bitcask) Merge() error {
 	}
 
 	// 创建新的文件管理器
-	mergeFM, err := NewFileManager(
+	mergeFM, err := file_manager.NewFileManager(
 		mergeDir,
 		db.cfg.MaxFileSize,
 		db.cfg.MaxOpenFiles,
@@ -427,7 +432,7 @@ func (db *Bitcask) Merge() error {
 	}
 
 	// 遍历所有有效的键值对
-	err = db.memIndex.Foreach(func(key string, entry Entry) bool {
+	err = db.memIndex.Foreach(func(key string, entry storage.Entry) bool {
 		record, err := db.fm.Read(entry)
 		if err != nil {
 			return false
@@ -469,7 +474,7 @@ func (db *Bitcask) Merge() error {
 	}
 
 	// 重新打开文件管理器
-	fm, err := NewFileManager(
+	fm, err := file_manager.NewFileManager(
 		db.cfg.DataDir,
 		db.cfg.MaxFileSize,
 		db.cfg.MaxOpenFiles,
@@ -500,7 +505,7 @@ func (db *Bitcask) autoMerge() {
 
 func (db *Bitcask) EstimateInvalidRatio() (float64, error) {
 	if db.closed {
-		return 0, ErrDBClosed
+		return 0, err_def.ErrDBClosed
 	}
 
 	db.mu.RLock()
@@ -525,7 +530,7 @@ func (db *Bitcask) EstimateInvalidRatio() (float64, error) {
 		return 0, nil
 	}
 
-	err = db.memIndex.Foreach(func(_ string, entry Entry) bool {
+	err = db.memIndex.Foreach(func(_ string, entry storage.Entry) bool {
 		validSize += int64(entry.Size)
 		return true
 	})
@@ -564,13 +569,13 @@ func (db *Bitcask) StopMerge() {
 // Sync 同步数据到磁盘
 func (db *Bitcask) Sync() error {
 	if db.closed {
-		return ErrDBClosed
+		return err_def.ErrDBClosed
 	}
 
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	if current := db.fm.getActiveFile(); current != nil {
+	if current := db.fm.GetActiveFile(); current != nil {
 		return current.File.Sync()
 	}
 	return nil
@@ -579,7 +584,7 @@ func (db *Bitcask) Sync() error {
 // Close 关闭数据库
 func (db *Bitcask) Close() error {
 	if db.closed {
-		return ErrDBClosed
+		return err_def.ErrDBClosed
 	}
 
 	db.mu.Lock()

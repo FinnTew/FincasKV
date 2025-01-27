@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"github.com/FinnTew/FincasKV/internal/storage"
+	"github.com/FinnTew/FincasKV/internal/storage/bitcask"
 	"log"
 	"strconv"
 )
 
 func main() {
 	// 创建数据库实例
-	db, err := storage.Open(
+	db, err := bitcask.Open(
 		storage.WithDataDir("./data"),
 		storage.WithMaxFileSize(1<<30),  // 1GB
 		storage.WithMemCacheSize(1<<20), // 1MB

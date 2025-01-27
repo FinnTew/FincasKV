@@ -1,4 +1,4 @@
-package storage
+package err_def
 
 import "errors"
 

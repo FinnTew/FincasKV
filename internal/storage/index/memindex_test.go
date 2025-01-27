@@ -1,6 +1,7 @@
-package storage
+package index
 
 import (
+	"github.com/FinnTew/FincasKV/internal/storage"
 	"testing"
 )
 
@@ -20,7 +21,7 @@ func TestMemIndexShard(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		memIndexType MemIndexType
+		memIndexType storage.MemIndexType
 		shardCount   int
 		operations   []struct {
 			op    string
@@ -31,7 +32,7 @@ func TestMemIndexShard(t *testing.T) {
 	}{
 		{
 			name:         "BTree operations",
-			memIndexType: BTree,
+			memIndexType: storage.BTree,
 			shardCount:   2,
 			operations: []struct {
 				op    string
@@ -49,7 +50,7 @@ func TestMemIndexShard(t *testing.T) {
 		},
 		{
 			name:         "SkipList operations",
-			memIndexType: SkipList,
+			memIndexType: storage.SkipList,
 			shardCount:   2,
 			operations: []struct {
 				op    string

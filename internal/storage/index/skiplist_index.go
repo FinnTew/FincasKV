@@ -1,6 +1,7 @@
-package storage
+package index
 
 import (
+	"github.com/FinnTew/FincasKV/internal/storage/err_def"
 	"math/rand"
 	"sync"
 	"time"
@@ -126,7 +127,7 @@ func (sl *SkipListIndex[K, V]) Get(key K) (V, error) {
 	}
 
 	var zero V
-	return zero, ErrKeyNotFound
+	return zero, err_def.ErrKeyNotFound
 }
 
 func (sl *SkipListIndex[K, V]) Del(key K) error {
@@ -145,7 +146,7 @@ func (sl *SkipListIndex[K, V]) Del(key K) error {
 
 	current = current.next[0]
 	if current == nil || sl.compare(current.key, key) != 0 {
-		return ErrKeyNotFound
+		return err_def.ErrKeyNotFound
 	}
 
 	for i := 0; i < sl.level; i++ {

@@ -1,8 +1,10 @@
-package storage
+package file_manager
 
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/storage"
+	"github.com/FinnTew/FincasKV/internal/storage/err_def"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"hash/crc64"
 	"io"
@@ -43,7 +45,7 @@ type AsyncWriteReq struct {
 }
 
 type AsyncWriteResp struct {
-	Entry Entry
+	Entry storage.Entry
 	Err   error
 }
 
@@ -100,7 +102,7 @@ func (fm *FileManager) initialize() error {
 	var maxID int
 	for _, f := range files {
 		var id int
-		_, err := fmt.Sscanf(f.Name(), FilePrefix+"%d"+FileSuffix, &id)
+		_, err := fmt.Sscanf(f.Name(), storage.FilePrefix+"%d"+storage.FileSuffix, &id)
 		if err == nil && id > maxID {
 			maxID = id
 		}
@@ -110,7 +112,7 @@ func (fm *FileManager) initialize() error {
 
 	if maxID > 0 {
 		// 重新打开旧的最大编号文件，用于后续追加
-		filePath := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", FilePrefix, maxID, FileSuffix))
+		filePath := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", storage.FilePrefix, maxID, storage.FileSuffix))
 		file, err := os.OpenFile(filePath, os.O_RDWR, 0644)
 		if err != nil {
 			return fmt.Errorf("open active file failed: %w", err)
@@ -120,7 +122,7 @@ func (fm *FileManager) initialize() error {
 			file.Close()
 			return fmt.Errorf("stat file failed: %w", err)
 		}
-		df := &DataFile{
+		df := &storage.DataFile{
 			ID:   maxID,
 			Path: filePath,
 			File: file,
@@ -138,7 +140,7 @@ func (fm *FileManager) initialize() error {
 }
 
 // WriteAsync 对外提供的异步写入接口，返回结果的 chan
-func (fm *FileManager) WriteAsync(r *Record) <-chan AsyncWriteResp {
+func (fm *FileManager) WriteAsync(r *storage.Record) <-chan AsyncWriteResp {
 	result := make(chan AsyncWriteResp, 1)
 
 	// 编码成二进制
@@ -168,7 +170,7 @@ func (fm *FileManager) WriteAsync(r *Record) <-chan AsyncWriteResp {
 	case <-fm.stopChan:
 		// 如果已经关闭，则立即返回错误
 		go func() {
-			result <- AsyncWriteResp{Err: ErrDBClosed}
+			result <- AsyncWriteResp{Err: err_def.ErrDBClosed}
 			close(result)
 		}()
 	}
@@ -194,17 +196,17 @@ func (fm *FileManager) processWrites() {
 }
 
 // syncWrite 内部真正执行写入的函数
-func (fm *FileManager) syncWrite(data []byte) (Entry, error) {
+func (fm *FileManager) syncWrite(data []byte) (storage.Entry, error) {
 	for {
-		current := fm.getActiveFile()
+		current := fm.GetActiveFile()
 		if current == nil {
-			return Entry{}, ErrFileNotFound
+			return storage.Entry{}, err_def.ErrFileNotFound
 		}
 		if current.Closed.Load() {
 			// 已关闭，进行轮转
 			_, err := fm.rotateFile()
 			if err != nil {
-				return Entry{}, err
+				return storage.Entry{}, err
 			}
 			continue
 		}
@@ -214,7 +216,7 @@ func (fm *FileManager) syncWrite(data []byte) (Entry, error) {
 		if offsetNow+int64(len(data)) > fm.maxFileSize {
 			_, err := fm.rotateFile()
 			if err != nil {
-				return Entry{}, err
+				return storage.Entry{}, err
 			}
 			continue
 		}
@@ -232,13 +234,13 @@ func (fm *FileManager) syncWrite(data []byte) (Entry, error) {
 
 			_, rotateErr := fm.rotateFile()
 			if rotateErr != nil {
-				return Entry{}, rotateErr
+				return storage.Entry{}, rotateErr
 			}
-			return Entry{}, ErrWriteFailed
+			return storage.Entry{}, err_def.ErrWriteFailed
 		}
 
 		// 写成功，返回对应的索引信息
-		return Entry{
+		return storage.Entry{
 			FileID:    current.ID,
 			Offset:    writePos,
 			Size:      uint32(len(data)),
@@ -248,8 +250,8 @@ func (fm *FileManager) syncWrite(data []byte) (Entry, error) {
 }
 
 // Read 按 Entry 信息从对应的文件偏移处读出数据并解码
-func (fm *FileManager) Read(entry Entry) (*Record, error) {
-	file, err := fm.getFile(entry.FileID)
+func (fm *FileManager) Read(entry storage.Entry) (*storage.Record, error) {
+	file, err := fm.GetFile(entry.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,29 +261,29 @@ func (fm *FileManager) Read(entry Entry) (*Record, error) {
 	if err != nil {
 		// 如果是 io.EOF 也要返回错误，说明数据不完整
 		if err == io.EOF {
-			return nil, fmt.Errorf("%w: unexpected EOF (fileID=%d)", ErrReadFailed, entry.FileID)
+			return nil, fmt.Errorf("%w: unexpected EOF (fileID=%d)", err_def.ErrReadFailed, entry.FileID)
 		}
-		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
+		return nil, fmt.Errorf("%w: %v", err_def.ErrReadFailed, err)
 	}
 
-	record, err := decodeRecord(buf)
+	record, err := DecodeRecord(buf)
 	if err != nil {
 		return nil, err
 	}
 
 	// 二次校验
 	if success, err := validateChecksum(record); !success || err != nil {
-		return nil, ErrChecksumInvalid
+		return nil, err_def.ErrChecksumInvalid
 	}
 	return record, nil
 }
 
 // rotateFile 轮转当前活跃文件，创建新文件并设为活跃文件
-func (fm *FileManager) rotateFile() (*DataFile, error) {
+func (fm *FileManager) rotateFile() (*storage.DataFile, error) {
 	fm.fileMu.Lock()
 	defer fm.fileMu.Unlock()
 
-	oldFile := fm.getActiveFile()
+	oldFile := fm.GetActiveFile()
 	if oldFile != nil && !oldFile.Closed.Load() {
 		// 并非已经关闭则先关闭
 		oldFile.Closed.Store(true)
@@ -290,7 +292,7 @@ func (fm *FileManager) rotateFile() (*DataFile, error) {
 	}
 
 	fileID := int(fm.fileID.Load())
-	path := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", FilePrefix, fileID, FileSuffix))
+	path := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", storage.FilePrefix, fileID, storage.FileSuffix))
 
 	// 以追加方式打开新文件，以便按 Offset 写
 	newF, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
@@ -298,7 +300,7 @@ func (fm *FileManager) rotateFile() (*DataFile, error) {
 		return nil, fmt.Errorf("create file failed: %w", err)
 	}
 
-	df := &DataFile{
+	df := &storage.DataFile{
 		ID:   fileID,
 		Path: path,
 		File: newF,
@@ -313,17 +315,17 @@ func (fm *FileManager) rotateFile() (*DataFile, error) {
 	return df, nil
 }
 
-// getActiveFile 获取当前活跃文件
-func (fm *FileManager) getActiveFile() *DataFile {
+// GetActiveFile 获取当前活跃文件
+func (fm *FileManager) GetActiveFile() *storage.DataFile {
 	val := fm.activeFile.Load()
 	if val == nil {
 		return nil
 	}
-	return val.(*DataFile)
+	return val.(*storage.DataFile)
 }
 
-// getFile 根据 fileID 从缓存中获取文件指针，若无则重新打开并放入缓存
-func (fm *FileManager) getFile(fileID int) (*os.File, error) {
+// GetFile 根据 fileID 从缓存中获取文件指针，若无则重新打开并放入缓存
+func (fm *FileManager) GetFile(fileID int) (*os.File, error) {
 	// 读锁检测
 	fm.RLock()
 	if file, ok := fm.openFiles.Get(fileID); ok {
@@ -341,11 +343,11 @@ func (fm *FileManager) getFile(fileID int) (*os.File, error) {
 		return file, nil
 	}
 
-	path := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", FilePrefix, fileID, FileSuffix))
+	path := filepath.Join(fm.dir, fmt.Sprintf("%s%d%s", storage.FilePrefix, fileID, storage.FileSuffix))
 	file, err := os.OpenFile(path, os.O_RDWR, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("%w: fileID=%d", ErrFileNotFound, fileID)
+			return nil, fmt.Errorf("%w: fileID=%d", err_def.ErrFileNotFound, fileID)
 		}
 		return nil, fmt.Errorf("open file failed (ID=%d): %w", fileID, err)
 	}
@@ -367,7 +369,7 @@ func (fm *FileManager) autoSync() {
 		select {
 		case <-fm.syncTicker.C:
 			fm.fileMu.Lock()
-			if current := fm.getActiveFile(); current != nil && !current.Closed.Load() {
+			if current := fm.GetActiveFile(); current != nil && !current.Closed.Load() {
 				_ = current.File.Sync()
 			}
 			fm.fileMu.Unlock()
@@ -394,7 +396,7 @@ func (fm *FileManager) Close() error {
 	defer fm.fileMu.Unlock()
 
 	// 关闭活跃文件
-	if current := fm.getActiveFile(); current != nil && !current.Closed.Load() {
+	if current := fm.GetActiveFile(); current != nil && !current.Closed.Load() {
 		current.Closed.Store(true)
 		_ = current.File.Sync()
 		_ = current.File.Close()
@@ -416,25 +418,25 @@ func (fm *FileManager) Close() error {
 
 // encodeRecord 将 Record 编码为二进制格式
 // 格式: [Timestamp(8)|Flags(4)|KeyLen(4)|ValueLen(4)|Key(?)|Value(?)|Checksum(8)]
-func encodeRecord(r *Record) ([]byte, error) {
+func encodeRecord(r *storage.Record) ([]byte, error) {
 	// 1. 输入验证
 	if r == nil {
-		return nil, ErrNilRecord
+		return nil, err_def.ErrNilRecord
 	}
 	if len(r.Key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
-	if len(r.Key) > MaxKeySize {
-		return nil, fmt.Errorf("%w: key length %d exceeds maximum %d", ErrKeyTooLarge, len(r.Key), MaxKeySize)
+	if len(r.Key) > storage.MaxKeySize {
+		return nil, fmt.Errorf("%w: key length %d exceeds maximum %d", err_def.ErrKeyTooLarge, len(r.Key), storage.MaxKeySize)
 	}
-	if len(r.Value) > MaxValueSize {
-		return nil, fmt.Errorf("%w: value length %d exceeds maximum %d", ErrValueTooLarge, len(r.Value), MaxValueSize)
+	if len(r.Value) > storage.MaxValueSize {
+		return nil, fmt.Errorf("%w: value length %d exceeds maximum %d", err_def.ErrValueTooLarge, len(r.Value), storage.MaxValueSize)
 	}
 
 	// 2. 计算长度
 	keyLen := len(r.Key)
 	valueLen := len(r.Value)
-	dataSize := HeaderSize + keyLen + valueLen
+	dataSize := storage.HeaderSize + keyLen + valueLen
 	totalSize := dataSize + 8 // 加上校验和的8字节
 
 	// 3. 分配并填充缓冲区
@@ -447,8 +449,8 @@ func encodeRecord(r *Record) ([]byte, error) {
 	binary.BigEndian.PutUint32(buf[16:20], uint32(valueLen))
 
 	// 写入键值对
-	copy(buf[HeaderSize:HeaderSize+keyLen], r.Key)
-	copy(buf[HeaderSize+keyLen:dataSize], r.Value)
+	copy(buf[storage.HeaderSize:storage.HeaderSize+keyLen], r.Key)
+	copy(buf[storage.HeaderSize+keyLen:dataSize], r.Value)
 
 	// 计算并写入校验和
 	checksum := crc64.Checksum(buf[:dataSize], crc64.MakeTable(crc64.ISO))
@@ -457,11 +459,11 @@ func encodeRecord(r *Record) ([]byte, error) {
 	return buf, nil
 }
 
-// decodeRecord 从二进制数据解析记录
-func decodeRecord(data []byte) (*Record, error) {
+// DecodeRecord 从二进制数据解析记录
+func DecodeRecord(data []byte) (*storage.Record, error) {
 	// 1. 基础长度检查
-	if len(data) < HeaderSize+8 { // HeaderSize + 校验和长度
-		return nil, fmt.Errorf("%w: got %d bytes, need at least %d", ErrInsufficientData, len(data), HeaderSize+8)
+	if len(data) < storage.HeaderSize+8 { // HeaderSize + 校验和长度
+		return nil, fmt.Errorf("%w: got %d bytes, need at least %d", err_def.ErrInsufficientData, len(data), storage.HeaderSize+8)
 	}
 
 	// 2. 读取头部信息
@@ -471,17 +473,17 @@ func decodeRecord(data []byte) (*Record, error) {
 	valueLen := binary.BigEndian.Uint32(data[16:20])
 
 	// 3. 验证长度
-	expectedLen := HeaderSize + int(keyLen) + int(valueLen) + 8
+	expectedLen := storage.HeaderSize + int(keyLen) + int(valueLen) + 8
 	if len(data) != expectedLen {
-		return nil, fmt.Errorf("%w: got %d bytes, expected %d", ErrDataLengthInvalid, len(data), expectedLen)
+		return nil, fmt.Errorf("%w: got %d bytes, expected %d", err_def.ErrDataLengthInvalid, len(data), expectedLen)
 	}
 
 	// 4. 边界检查
-	if keyLen > uint32(MaxKeySize) {
-		return nil, ErrKeyTooLarge
+	if keyLen > uint32(storage.MaxKeySize) {
+		return nil, err_def.ErrKeyTooLarge
 	}
-	if valueLen > uint32(MaxValueSize) {
-		return nil, ErrValueTooLarge
+	if valueLen > uint32(storage.MaxValueSize) {
+		return nil, err_def.ErrValueTooLarge
 	}
 
 	dataSize := len(data) - 8
@@ -490,11 +492,11 @@ func decodeRecord(data []byte) (*Record, error) {
 	storedChecksum := binary.BigEndian.Uint64(data[dataSize:])
 	calculatedChecksum := crc64.Checksum(data[:dataSize], crc64.MakeTable(crc64.ISO))
 	if calculatedChecksum != storedChecksum {
-		return nil, fmt.Errorf("%w: stored=%x, calculated=%x", ErrChecksumMismatch, storedChecksum, calculatedChecksum)
+		return nil, fmt.Errorf("%w: stored=%x, calculated=%x", err_def.ErrChecksumMismatch, storedChecksum, calculatedChecksum)
 	}
 
 	// 6. 提取键值对
-	keyStart := HeaderSize
+	keyStart := storage.HeaderSize
 	keyEnd := keyStart + int(keyLen)
 	valueStart := keyEnd
 	valueEnd := valueStart + int(valueLen)
@@ -506,11 +508,11 @@ func decodeRecord(data []byte) (*Record, error) {
 	copy(value, data[valueStart:valueEnd])
 
 	// 7. 构造并返回记录
-	return &Record{
+	return &storage.Record{
 		Timestamp: timestamp,
 		Flags:     flags,
 		Checksum:  storedChecksum,
-		KVItem: KVItem{
+		KVItem: storage.KVItem{
 			Key:   key,
 			Value: value,
 		},
@@ -518,9 +520,9 @@ func decodeRecord(data []byte) (*Record, error) {
 }
 
 // validateChecksum 验证记录的完整性
-func validateChecksum(r *Record) (bool, error) {
+func validateChecksum(r *storage.Record) (bool, error) {
 	if r == nil {
-		return false, ErrNilRecord
+		return false, err_def.ErrNilRecord
 	}
 	if r.Checksum == 0 {
 		return false, nil

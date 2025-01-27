@@ -1,7 +1,8 @@
-package storage
+package index
 
 import (
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/storage"
 	"hash/fnv"
 	"log"
 	"math/rand"
@@ -10,12 +11,12 @@ import (
 
 type MemIndexShard[K comparable, V any] struct {
 	shardCount int
-	shards     []MemIndex[K, V]
+	shards     []storage.MemIndex[K, V]
 	sync.RWMutex
 }
 
 func NewMemIndexShard[K comparable, V any](
-	memIndexType MemIndexType,
+	memIndexType storage.MemIndexType,
 	shardCount int,
 	btreeDegree int,
 	btreeLessFunc func(a, b K) bool,
@@ -24,12 +25,12 @@ func NewMemIndexShard[K comparable, V any](
 ) *MemIndexShard[K, V] {
 	index := &MemIndexShard[K, V]{
 		shardCount: shardCount,
-		shards:     make([]MemIndex[K, V], shardCount),
+		shards:     make([]storage.MemIndex[K, V], shardCount),
 	}
 
 	for i := 0; i < shardCount; i++ {
 		switch memIndexType {
-		case BTree:
+		case storage.BTree:
 			if btreeDegree <= 0 {
 				log.Fatal("BTree degree must be greater than 0")
 			}
@@ -37,7 +38,7 @@ func NewMemIndexShard[K comparable, V any](
 				log.Fatal("BTree less func cannot be nil")
 			}
 			index.shards[i] = NewBTreeIndex[K, V](btreeDegree, btreeLessFunc)
-		case SkipList:
+		case storage.SkipList:
 			if skipListLessFunc == nil {
 				log.Fatal("SkipList less func cannot be nil")
 			}
@@ -54,7 +55,7 @@ func NewMemIndexShard[K comparable, V any](
 	return index
 }
 
-func (s *MemIndexShard[K, V]) getShard(key K) MemIndex[K, V] {
+func (s *MemIndexShard[K, V]) getShard(key K) storage.MemIndex[K, V] {
 	h := fnv.New32a()
 	h.Write([]byte(fmt.Sprintf("%v", key)))
 	return s.shards[h.Sum32()%uint32(s.shardCount)]
@@ -116,7 +117,7 @@ func (s *MemIndexShard[K, V]) Clear() error {
 
 	for _, shard := range s.shards {
 		wg.Add(1)
-		go func(s MemIndex[K, V]) {
+		go func(s storage.MemIndex[K, V]) {
 			defer wg.Done()
 			if err := s.Clear(); err != nil {
 				errChan <- err
