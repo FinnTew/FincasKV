@@ -18,10 +18,9 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [x] MemCache(implement LRUCache only)
   - [x] Use BloomFilter
 - [ ] DB
-  - [ ] Put With TTL
+  - [x] Put With TTL
   - [ ] Transaction
     - [ ] MVCC
-  - [ ] Batch
   - [ ] Redis DataStructure(Both Transaction and Without-Transaction): Plan to implemented by the way of multi-key
     - [ ] String
     - [ ] List
