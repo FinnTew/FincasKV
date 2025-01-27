@@ -570,6 +570,18 @@ func (db *Bitcask) StopMerge() {
 	}
 }
 
+func (db *Bitcask) GetFilter() *util.ShardedBloomFilter {
+	return db.filter
+}
+
+func (db *Bitcask) GetMemIndex() storage.MemIndex[string, storage.Entry] {
+	return db.memIndex
+}
+
+func (db *Bitcask) GetDataDir() string {
+	return db.cfg.DataDir
+}
+
 // Sync 同步数据到磁盘
 func (db *Bitcask) Sync() error {
 	if db.closed {
