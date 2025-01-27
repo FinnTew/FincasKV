@@ -86,6 +86,11 @@ func (db *BaseDB) Del(key string) error {
 	return db.bc.Del(key)
 }
 
+func (db *BaseDB) Begin() (*Transaction, error) {
+	// TODO: implement Begin method
+	return &Transaction{}, nil
+}
+
 func (db *BaseDB) Close() {
 	close(db.closeCh)
 	db.wg.Wait()
