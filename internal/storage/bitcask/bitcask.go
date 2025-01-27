@@ -69,6 +69,7 @@ func Open(options ...storage.Option) (*Bitcask, error) {
 		cfg.BTreeComparator,
 		cfg.SkipListRandSource,
 		cfg.SkipListComparator,
+		cfg.SwissTableSize,
 	)
 
 	var memCache storage.MemCache[string, []byte]
