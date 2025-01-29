@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"fmt"
 	"github.com/FinnTew/FincasKV/internal/database/base"
 	"github.com/FinnTew/FincasKV/internal/storage"
 	"sync"
@@ -14,6 +15,10 @@ var (
 	SetPrefix    = "set:"
 	ZSetPrefix   = "zset:"
 )
+
+func GetStringKey(key string) string {
+	return fmt.Sprintf("%s%s", StringPrefix, key)
+}
 
 var bitcaskOpts = []storage.Option{
 	storage.WithDataDir("./fincas"),

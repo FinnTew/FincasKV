@@ -15,13 +15,13 @@ type RString struct {
 
 func (rs *RString) Set(key, value string) error {
 	db := (&DBWrapper{}).GetDB()
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	return db.Put(key, value)
 }
 
 func (rs *RString) Get(key string) (string, error) {
 	db := (&DBWrapper{}).GetDB()
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	return db.Get(key)
 }
 
@@ -31,7 +31,7 @@ func (rs *RString) Incr(key string) (int64, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	data, err := db.Get(key)
 	var curr int
 	if errors.Is(err, err_def.ErrKeyNotFound) {
@@ -60,7 +60,7 @@ func (rs *RString) IncrBy(key string, value int64) (int64, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	data, err := db.Get(key)
 	var curr int
 
@@ -90,7 +90,7 @@ func (rs *RString) Decr(key string) (int64, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	data, err := db.Get(key)
 	var curr int
 
@@ -120,7 +120,7 @@ func (rs *RString) DecrBy(key string, value int64) (int64, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	data, err := db.Get(key)
 	var curr int
 
@@ -150,7 +150,7 @@ func (rs *RString) Append(key, value string) (int64, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	data, err := db.Get(key)
 	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 		return 0, err
@@ -175,7 +175,7 @@ func (rs *RString) GetSet(key, value string) (string, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	key = getStringKey(key)
+	key = GetStringKey(key)
 	data, err := db.Get(key)
 	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 		return "", err
@@ -244,7 +244,7 @@ func (rs *RString) MSet(pairs map[string]string) error {
 
 	if len(pairs) <= 100 {
 		for _, key := range keys {
-			if err := db.Put(getStringKey(key), pairs[key]); err != nil {
+			if err := db.Put(GetStringKey(key), pairs[key]); err != nil {
 				return fmt.Errorf("failed to put key-value pair {%s, %s}: %v", key, pairs[key], err)
 			}
 		}
@@ -273,7 +273,7 @@ func (rs *RString) MSet(pairs map[string]string) error {
 
 			for j := start; j < end; j++ {
 				key := keys[j]
-				if err := db.Put(getStringKey(key), pairs[key]); err != nil {
+				if err := db.Put(GetStringKey(key), pairs[key]); err != nil {
 					errChan <- fmt.Errorf("failed to put key-value pair {%s, %s}: %v", key, pairs[key], err)
 					return
 				}
@@ -293,8 +293,4 @@ func (rs *RString) MSet(pairs map[string]string) error {
 	}
 
 	return nil
-}
-
-func getStringKey(key string) string {
-	return fmt.Sprintf("%s%s", StringPrefix, key)
 }
