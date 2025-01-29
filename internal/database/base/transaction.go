@@ -1,5 +1,6 @@
 package base
 
 type Transaction struct {
-	// TODO: implement transaction
+	ID uint64
+	// TODO: add more fields
 }
