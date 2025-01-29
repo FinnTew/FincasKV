@@ -227,7 +227,7 @@ func (rs *RString) MSet(pairs map[string]string) error {
 	}
 	sort.Strings(keys)
 
-	locks := make([]*sync.Mutex, 0, len(keys))
+	locks := make([]*sync.Mutex, len(keys))
 	defer func() {
 		for i := len(locks) - 1; i >= 0; i-- {
 			if locks[i] != nil {
@@ -244,7 +244,7 @@ func (rs *RString) MSet(pairs map[string]string) error {
 
 	if len(pairs) <= 100 {
 		for _, key := range keys {
-			if err := db.Put(key, pairs[key]); err != nil {
+			if err := db.Put(getStringKey(key), pairs[key]); err != nil {
 				return fmt.Errorf("failed to put key-value pair {%s, %s}: %v", key, pairs[key], err)
 			}
 		}
@@ -273,7 +273,7 @@ func (rs *RString) MSet(pairs map[string]string) error {
 
 			for j := start; j < end; j++ {
 				key := keys[j]
-				if err := db.Put(key, pairs[key]); err != nil {
+				if err := db.Put(getStringKey(key), pairs[key]); err != nil {
 					errChan <- fmt.Errorf("failed to put key-value pair {%s, %s}: %v", key, pairs[key], err)
 					return
 				}
