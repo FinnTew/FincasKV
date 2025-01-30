@@ -53,6 +53,10 @@ func GetZSetMemberScoreKey(key, member string) string {
 	return fmt.Sprintf("%s:%s:%s", ZSetPrefix, key, member)
 }
 
+func GetZSetSortKey(key string, score float64, member string) string {
+	return fmt.Sprintf("%s:%s:s:%s:%s", ZSetPrefix, key, float64ToOrderedString(score), member)
+}
+
 func float64ToOrderedString(score float64) string {
 	bits := math.Float64bits(score)
 	if (bits & (1 << 63)) != 0 {
@@ -61,10 +65,6 @@ func float64ToOrderedString(score float64) string {
 		bits |= 1 << 63
 	}
 	return fmt.Sprintf("%016x", bits)
-}
-
-func GetZSetSortKey(key string, score float64, member string) string {
-	return fmt.Sprintf("%s:%s:s:%s:%s", ZSetPrefix, key, float64ToOrderedString(score), member)
 }
 
 var bitcaskOpts = []storage.Option{
@@ -105,7 +105,6 @@ type RedisString interface {
 	MSet(pairs map[string]string) error
 	MGet(keys ...string) (map[string]string, error)
 	StrLen(key string) (int64, error)
-	TTL(key string) (time.Duration, error)
 }
 
 type RedisList interface {

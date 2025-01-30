@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/FinnTew/FincasKV/internal/database/redis"
 	"log"
 )
@@ -61,20 +62,20 @@ func main() {
 		"hello": "world",
 		"foo":   "bar",
 	})
-	v, err := r.Get("hello")
+	res, err := r.MGet("hello", "foo")
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(v)
-
-	v, err = r.Get("foo")
-	if err != nil {
-		log.Fatal(err)
+	for k, v := range res {
+		length, err := r.StrLen(k)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%s => %s (len: %d)\n", k, v, length)
 	}
-	log.Println(v)
 
 	r.Set("val", "1")
-	v, err = r.Get("val")
+	v, err := r.Get("val")
 	if err != nil {
 		log.Fatal(err)
 	}

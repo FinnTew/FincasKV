@@ -294,3 +294,54 @@ func (rs *RString) MSet(pairs map[string]string) error {
 
 	return nil
 }
+
+func (rs *RString) MGet(keys ...string) (map[string]string, error) {
+	db := (&DBWrapper{}).GetDB()
+
+	if len(keys) == 0 {
+		return map[string]string{}, nil
+	}
+
+	result := make(map[string]string, len(keys))
+
+	type getRes struct {
+		key   string
+		value string
+		err   error
+	}
+
+	resultChan := make(chan getRes, len(keys))
+	var wg sync.WaitGroup
+
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			value, err := db.Get(GetStringKey(k))
+			resultChan <- getRes{k, value, err}
+		}(key)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for r := range resultChan {
+		if r.err != nil {
+			return nil, fmt.Errorf("failed to get {%s}: %v", r.key, r.err)
+		}
+		result[r.key] = r.value
+	}
+
+	return result, nil
+}
+
+func (rs *RString) StrLen(key string) (int64, error) {
+	db := (&DBWrapper{}).GetDB()
+	value, err := db.Get(GetStringKey(key))
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(value)), nil
+}
