@@ -198,6 +198,7 @@ func (rs *RString) SetNX(key, value string) (bool, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
+	key = GetStringKey(key)
 	_, err := db.Get(key)
 	if err == nil {
 		return false, nil
