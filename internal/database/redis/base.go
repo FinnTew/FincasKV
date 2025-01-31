@@ -25,6 +25,10 @@ func GetHashFieldKey(key, field string) string {
 	return fmt.Sprintf("%s:%s:%s", HashPrefix, key, field)
 }
 
+func GetHashLenKey(key string) string {
+	return fmt.Sprintf("%s:%s:_len_", HashPrefix, key)
+}
+
 func GetListItemKey(key string, index int64) string {
 	return fmt.Sprintf("%s:%s:%d", ListPrefix, key, index)
 }
