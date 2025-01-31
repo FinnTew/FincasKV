@@ -19,10 +19,9 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [x] Use BloomFilter
 - [ ] DB
   - [x] Put With TTL
-  - [ ] Transaction
-    - [ ] MVCC
-  - [ ] Redis DataStructure(Both Transaction and Without-Transaction): Plan to implemented by the way of multi-key
-    - [ ] String
+  - [x] Batch Operation
+  - [ ] Redis DataStructure: Plan to implemented by the way of multi-key
+    - [x] String
     - [ ] List
     - [ ] Hash
     - [ ] Set
