@@ -86,11 +86,6 @@ func (db *BaseDB) Del(key string) error {
 	return db.bc.Del(key)
 }
 
-func (db *BaseDB) Begin() (*Transaction, error) {
-	// TODO: implement Begin method
-	return &Transaction{}, nil
-}
-
 func (db *BaseDB) Close() {
 	close(db.closeCh)
 	db.wg.Wait()
@@ -227,6 +222,20 @@ func (db *BaseDB) Persist(key string) error {
 		_ = db.saveTTLMetadata()
 	}
 	return nil
+}
+
+func (db *BaseDB) NewWriteBatch(opts *BatchOptions) *WriteBatch {
+	if opts == nil {
+		opts = DefaultBatchOptions()
+	}
+
+	wb := batchPool.Get().(*WriteBatch)
+	wb.db = db
+	wb.committed = false
+	wb.opts = opts
+	wb.operations = wb.operations[:0]
+
+	return wb
 }
 
 func (db *BaseDB) expirationWorker(interval time.Duration) {
