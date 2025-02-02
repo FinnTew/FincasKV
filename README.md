@@ -23,7 +23,7 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [ ] Redis DataStructure: Plan to implemented by the way of multi-key
     - [x] String
     - [ ] List
-    - [ ] Hash
+    - [x] Hash
     - [ ] Set
     - [ ] ZSet
 - [ ] Network & Supported RESP
