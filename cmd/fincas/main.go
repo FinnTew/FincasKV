@@ -86,7 +86,7 @@ import (
 //}
 
 func main() {
-	r := redis.RString{}
+	r := redis.NewRString()
 	r.MSet(map[string]string{
 		"hello": "world",
 		"foo":   "bar",
