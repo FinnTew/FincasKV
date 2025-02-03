@@ -1,6 +1,9 @@
 package err_def
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	ErrKeyNotFound       = errors.New("key not found")
@@ -16,4 +19,6 @@ var (
 	ErrChecksumMismatch  = errors.New("checksum mismatch")
 	ErrInsufficientData  = errors.New("insufficient data")
 	ErrDataLengthInvalid = errors.New("invalid data length")
+	ErrValueNotInteger   = fmt.Errorf("value is not an integer")
+	ErrValueNotFloat     = fmt.Errorf("value is not a float")
 )

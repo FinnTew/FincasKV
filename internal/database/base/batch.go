@@ -3,7 +3,7 @@ package base
 import (
 	"context"
 	"fmt"
-	"github.com/FinnTew/FincasKV/internal/storage/err_def"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"sort"
 	"sync"
 	"time"

@@ -3,9 +3,9 @@ package bitcask
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"github.com/FinnTew/FincasKV/internal/storage"
 	"github.com/FinnTew/FincasKV/internal/storage/cache"
-	"github.com/FinnTew/FincasKV/internal/storage/err_def"
 	"github.com/FinnTew/FincasKV/internal/storage/file_manager"
 	"github.com/FinnTew/FincasKV/internal/storage/index"
 	"github.com/FinnTew/FincasKV/util"

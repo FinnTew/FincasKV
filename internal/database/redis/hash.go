@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,7 +32,7 @@ func (rh *RHash) Release() {
 // batchSetFields 批量设置哈希字段
 func (rh *RHash) batchSetFields(key string, fields map[string]string, nx bool) error {
 	if len(key) == 0 {
-		return ErrEmptyKey
+		return err_def.ErrEmptyKey
 	}
 	if len(fields) == 0 {
 		return nil
@@ -43,7 +44,7 @@ func (rh *RHash) batchSetFields(key string, fields map[string]string, nx bool) e
 	// 获取当前hash长度
 	lenKey := GetHashLenKey(key)
 	currentLen, err := rh.HLen(key)
-	if err != nil && !errors.Is(err, ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 		return err
 	}
 
@@ -93,7 +94,7 @@ func (rh *RHash) HSet(key, field, value string) error {
 
 func (rh *RHash) HGet(key, field string) (string, error) {
 	if len(key) == 0 || len(field) == 0 {
-		return "", ErrEmptyKey
+		return "", err_def.ErrEmptyKey
 	}
 
 	return rh.dw.GetDB().Get(GetHashFieldKey(key, field))
@@ -105,7 +106,7 @@ func (rh *RHash) HMSet(key string, fields map[string]string) error {
 
 func (rh *RHash) HMGet(key string, fields ...string) (map[string]string, error) {
 	if len(key) == 0 || len(fields) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 
 	result := make(map[string]string, len(fields))
@@ -124,7 +125,7 @@ func (rh *RHash) HMGet(key string, fields ...string) (map[string]string, error) 
 			defer wg.Done()
 			val, err := rh.dw.GetDB().Get(GetHashFieldKey(key, f))
 			if err != nil {
-				if !errors.Is(err, ErrKeyNotFound) {
+				if !errors.Is(err, err_def.ErrKeyNotFound) {
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("error getting field %s: %v", f, err))
 					mu.Unlock()
@@ -149,7 +150,7 @@ func (rh *RHash) HMGet(key string, fields ...string) (map[string]string, error) 
 
 func (rh *RHash) HDel(key string, fields ...string) (int64, error) {
 	if len(key) == 0 || len(fields) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	wb := rh.dw.GetDB().NewWriteBatch(nil)
@@ -174,7 +175,7 @@ func (rh *RHash) HDel(key string, fields ...string) (int64, error) {
 
 	if deleted > 0 {
 		currentLen, err := rh.HLen(key)
-		if err != nil && !errors.Is(err, ErrKeyNotFound) {
+		if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, err
 		}
 		if err := wb.Put(GetHashLenKey(key), strconv.FormatInt(currentLen-deleted, 10)); err != nil {
@@ -191,7 +192,7 @@ func (rh *RHash) HDel(key string, fields ...string) (int64, error) {
 
 func (rh *RHash) HExists(key, field string) (bool, error) {
 	if len(key) == 0 || len(field) == 0 {
-		return false, ErrEmptyKey
+		return false, err_def.ErrEmptyKey
 	}
 
 	return rh.dw.GetDB().Exists(GetHashFieldKey(key, field))
@@ -199,7 +200,7 @@ func (rh *RHash) HExists(key, field string) (bool, error) {
 
 func (rh *RHash) HKeys(key string) ([]string, error) {
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 
 	pattern := fmt.Sprintf("%s:%s:*", HashPrefix, key)
@@ -225,7 +226,7 @@ func (rh *RHash) HKeys(key string) ([]string, error) {
 
 func (rh *RHash) HVals(key string) ([]string, error) {
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 
 	fields, err := rh.HKeys(key)
@@ -247,7 +248,7 @@ func (rh *RHash) HVals(key string) ([]string, error) {
 
 func (rh *RHash) HGetAll(key string) (map[string]string, error) {
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 
 	fields, err := rh.HKeys(key)
@@ -260,12 +261,12 @@ func (rh *RHash) HGetAll(key string) (map[string]string, error) {
 
 func (rh *RHash) HLen(key string) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	val, err := rh.dw.GetDB().Get(GetHashLenKey(key))
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, nil
 		}
 		return 0, err
@@ -276,7 +277,7 @@ func (rh *RHash) HLen(key string) (int64, error) {
 
 func (rh *RHash) HIncrBy(key, field string, incr int64) (int64, error) {
 	if len(key) == 0 || len(field) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	hashKey := GetHashFieldKey(key, field)
@@ -285,7 +286,7 @@ func (rh *RHash) HIncrBy(key, field string, incr int64) (int64, error) {
 
 	val, err := rh.dw.GetDB().Get(hashKey)
 	if err != nil {
-		if !errors.Is(err, ErrKeyNotFound) {
+		if !errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, err
 		}
 		// Key不存在时设置初始值
@@ -306,7 +307,7 @@ func (rh *RHash) HIncrBy(key, field string, incr int64) (int64, error) {
 
 	current, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
-		return 0, ErrValueNotInteger
+		return 0, err_def.ErrValueNotInteger
 	}
 
 	result := current + incr
@@ -323,7 +324,7 @@ func (rh *RHash) HIncrBy(key, field string, incr int64) (int64, error) {
 
 func (rh *RHash) HIncrByFloat(key, field string, incr float64) (float64, error) {
 	if len(key) == 0 || len(field) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	hashKey := GetHashFieldKey(key, field)
@@ -332,7 +333,7 @@ func (rh *RHash) HIncrByFloat(key, field string, incr float64) (float64, error) 
 
 	val, err := rh.dw.GetDB().Get(hashKey)
 	if err != nil {
-		if !errors.Is(err, ErrKeyNotFound) {
+		if !errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, err
 		}
 		// Key不存在时设置初始值
@@ -353,7 +354,7 @@ func (rh *RHash) HIncrByFloat(key, field string, incr float64) (float64, error) 
 
 	current, err := strconv.ParseFloat(val, 64)
 	if err != nil {
-		return 0, ErrValueNotFloat
+		return 0, err_def.ErrValueNotFloat
 	}
 
 	result := current + incr
@@ -370,7 +371,7 @@ func (rh *RHash) HIncrByFloat(key, field string, incr float64) (float64, error) 
 
 func (rh *RHash) HSetNX(key, field, value string) (bool, error) {
 	if len(key) == 0 || len(field) == 0 {
-		return false, ErrEmptyKey
+		return false, err_def.ErrEmptyKey
 	}
 
 	err := rh.batchSetFields(key, map[string]string{field: value}, true)
@@ -388,12 +389,12 @@ func (rh *RHash) HSetNX(key, field, value string) (bool, error) {
 
 func (rh *RHash) HStrLen(key, field string) (int64, error) {
 	if len(key) == 0 || len(field) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	val, err := rh.HGet(key, field)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, nil
 		}
 		return 0, err

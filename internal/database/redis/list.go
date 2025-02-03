@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"github.com/FinnTew/FincasKV/internal/database/base"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"strconv"
 	"sync"
 	"time"
@@ -32,7 +33,7 @@ func (rl *RList) Release() {
 func (rl *RList) getListLen(key string) (int64, error) {
 	lenStr, err := rl.dw.GetDB().Get(GetListLenKey(key))
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, nil
 		}
 		return 0, err
@@ -46,18 +47,18 @@ func (rl *RList) setListLen(wb *base.WriteBatch, key string, length int64) error
 
 func (rl *RList) getListPointers(key string) (head, tail int64, err error) {
 	headStr, err := rl.dw.GetDB().Get(GetListHeadKey(key))
-	if err != nil && !errors.Is(err, ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 		return 0, 0, err
 	}
-	if errors.Is(err, ErrKeyNotFound) {
+	if errors.Is(err, err_def.ErrKeyNotFound) {
 		headStr = "0"
 	}
 
 	tailStr, err := rl.dw.GetDB().Get(GetListTailKey(key))
-	if err != nil && !errors.Is(err, ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 		return 0, 0, err
 	}
-	if errors.Is(err, ErrKeyNotFound) {
+	if errors.Is(err, err_def.ErrKeyNotFound) {
 		tailStr = "0"
 	}
 
@@ -170,7 +171,7 @@ func (rl *RList) LPop(key string) (string, error) {
 		return "", err
 	}
 	if length == 0 {
-		return "", ErrKeyNotFound
+		return "", err_def.ErrKeyNotFound
 	}
 
 	head, _, err := rl.getListPointers(key)
@@ -223,7 +224,7 @@ func (rl *RList) RPop(key string) (string, error) {
 		return "", err
 	}
 	if length == 0 {
-		return "", ErrKeyNotFound
+		return "", err_def.ErrKeyNotFound
 	}
 
 	_, tail, err := rl.getListPointers(key)
@@ -407,7 +408,7 @@ func (rl *RList) BLPop(timeout time.Duration, keys ...string) (map[string]string
 				rl.mu.Unlock()
 				return result, nil
 			}
-			if !errors.Is(err, ErrKeyNotFound) {
+			if !errors.Is(err, err_def.ErrKeyNotFound) {
 				rl.mu.Unlock()
 				return nil, err
 			}
@@ -437,7 +438,7 @@ func (rl *RList) BRPop(timeout time.Duration, keys ...string) (map[string]string
 				rl.mu.Unlock()
 				return result, nil
 			}
-			if !errors.Is(err, ErrKeyNotFound) {
+			if !errors.Is(err, err_def.ErrKeyNotFound) {
 				rl.mu.Unlock()
 				return nil, err
 			}

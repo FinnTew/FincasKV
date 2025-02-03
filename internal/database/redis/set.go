@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -32,7 +33,7 @@ func (rs *RSet) Release() {
 
 func (rs *RSet) SAdd(key string, members ...string) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 	if len(members) == 0 {
 		return 0, nil
@@ -85,7 +86,7 @@ func (rs *RSet) SAdd(key string, members ...string) (int64, error) {
 
 func (rs *RSet) SRem(key string, members ...string) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 	if len(members) == 0 {
 		return 0, nil
@@ -140,7 +141,7 @@ func (rs *RSet) SRem(key string, members ...string) (int64, error) {
 
 func (rs *RSet) SIsMember(key, member string) (bool, error) {
 	if len(key) == 0 {
-		return false, ErrEmptyKey
+		return false, err_def.ErrEmptyKey
 	}
 	memberKey := GetSetMemberKey(key, member)
 	return rs.dw.GetDB().Exists(memberKey)
@@ -148,7 +149,7 @@ func (rs *RSet) SIsMember(key, member string) (bool, error) {
 
 func (rs *RSet) SMembers(key string) ([]string, error) {
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 
 	prefix := fmt.Sprintf("%s:%s:", SetPrefix, key)
@@ -171,12 +172,12 @@ func (rs *RSet) SMembers(key string) ([]string, error) {
 
 func (rs *RSet) SCard(key string) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	val, err := rs.dw.GetDB().Get(GetSetLenKey(key))
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, nil
 		}
 		return 0, err
@@ -198,7 +199,7 @@ func (rs *RSet) SPop(key string) (string, error) {
 
 func (rs *RSet) SPopN(key string, count int) ([]string, error) {
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 	if count <= 0 {
 		return []string{}, nil
@@ -231,7 +232,7 @@ func (rs *RSet) SPopN(key string, count int) ([]string, error) {
 
 func (rs *RSet) SRandMember(key string, count int) ([]string, error) {
 	if len(key) == 0 {
-		return nil, ErrEmptyKey
+		return nil, err_def.ErrEmptyKey
 	}
 	if count == 0 {
 		return []string{}, nil
@@ -376,7 +377,7 @@ func (rs *RSet) SInter(keys ...string) ([]string, error) {
 
 func (rs *RSet) SMove(source, destination, member string) (bool, error) {
 	if len(source) == 0 || len(destination) == 0 {
-		return false, ErrEmptyKey
+		return false, err_def.ErrEmptyKey
 	}
 
 	wb := rs.dw.GetDB().NewWriteBatch(nil)

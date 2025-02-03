@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,14 +31,14 @@ func (rs *RString) Release() {
 
 func (rs *RString) Set(key, value string) error {
 	if len(key) == 0 {
-		return ErrEmptyKey
+		return err_def.ErrEmptyKey
 	}
 	return rs.dw.GetDB().Put(GetStringKey(key), value)
 }
 
 func (rs *RString) Get(key string) (string, error) {
 	if len(key) == 0 {
-		return "", ErrEmptyKey
+		return "", err_def.ErrEmptyKey
 	}
 	return rs.dw.GetDB().Get(GetStringKey(key))
 }
@@ -48,7 +49,7 @@ func (rs *RString) Incr(key string) (int64, error) {
 
 func (rs *RString) IncrBy(key string, value int64) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	strKey := GetStringKey(key)
@@ -70,7 +71,7 @@ func (rs *RString) IncrBy(key string, value int64) (int64, error) {
 	// 尝试转换为int64
 	current, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
-		return 0, ErrValueNotInteger
+		return 0, err_def.ErrValueNotInteger
 	}
 
 	result := current + value
@@ -94,7 +95,7 @@ func (rs *RString) DecrBy(key string, value int64) (int64, error) {
 
 func (rs *RString) Append(key, value string) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	strKey := GetStringKey(key)
@@ -125,7 +126,7 @@ func (rs *RString) Append(key, value string) (int64, error) {
 
 func (rs *RString) GetSet(key, value string) (string, error) {
 	if len(key) == 0 {
-		return "", ErrEmptyKey
+		return "", err_def.ErrEmptyKey
 	}
 
 	strKey := GetStringKey(key)
@@ -133,7 +134,7 @@ func (rs *RString) GetSet(key, value string) (string, error) {
 	defer wb.Release()
 
 	oldVal, err := rs.dw.GetDB().Get(strKey)
-	if err != nil && !errors.Is(err, ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 		return "", err
 	}
 
@@ -149,7 +150,7 @@ func (rs *RString) GetSet(key, value string) (string, error) {
 
 func (rs *RString) SetNX(key, value string) (bool, error) {
 	if len(key) == 0 {
-		return false, ErrEmptyKey
+		return false, err_def.ErrEmptyKey
 	}
 
 	strKey := GetStringKey(key)
@@ -184,7 +185,7 @@ func (rs *RString) MSet(pairs map[string]string) error {
 
 	for k, v := range pairs {
 		if len(k) == 0 {
-			return ErrEmptyKey
+			return err_def.ErrEmptyKey
 		}
 		if err := wb.Put(GetStringKey(k), v); err != nil {
 			return err
@@ -216,7 +217,7 @@ func (rs *RString) MGet(keys ...string) (map[string]string, error) {
 			defer wg.Done()
 			val, err := rs.dw.GetDB().Get(GetStringKey(k))
 			if err != nil {
-				if !errors.Is(err, ErrKeyNotFound) {
+				if !errors.Is(err, err_def.ErrKeyNotFound) {
 					mu.Lock()
 					errs = append(errs, fmt.Sprintf("error getting key %s: %v", k, err))
 					mu.Unlock()
@@ -241,12 +242,12 @@ func (rs *RString) MGet(keys ...string) (map[string]string, error) {
 
 func (rs *RString) StrLen(key string) (int64, error) {
 	if len(key) == 0 {
-		return 0, ErrEmptyKey
+		return 0, err_def.ErrEmptyKey
 	}
 
 	val, err := rs.dw.GetDB().Get(GetStringKey(key))
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, nil
 		}
 		return 0, err

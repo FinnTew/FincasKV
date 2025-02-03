@@ -3,8 +3,8 @@ package file_manager
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"github.com/FinnTew/FincasKV/internal/storage"
-	"github.com/FinnTew/FincasKV/internal/storage/err_def"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"hash/crc64"
 	"io"

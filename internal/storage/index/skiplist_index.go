@@ -1,7 +1,7 @@
 package index
 
 import (
-	"github.com/FinnTew/FincasKV/internal/storage/err_def"
+	"github.com/FinnTew/FincasKV/internal/err_def"
 	"math/rand"
 	"sync"
 	"time"
