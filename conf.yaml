@@ -1,0 +1,23 @@
+base:
+  data_dir: "./fincas"
+
+mem_index:
+  data_structure: swisstable
+  shard_count: 256
+  btree_degree: 8
+  swiss_table_initial_size: 1024
+
+mem_cache:
+  enable: true
+  data_structure: lru
+  size: 1024
+
+file_manager:
+  max_size: 1073741824
+  max_opened: 10
+  sync_interval: 5s
+
+merge:
+  auto: true
+  interval: 1h
+  min_ratio: 0.3
