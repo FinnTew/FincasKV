@@ -10,6 +10,8 @@ require (
 )
 
 require (
+	github.com/bytedance/gopkg v0.1.0 // indirect
+	github.com/cloudwego/netpoll v0.6.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dolthub/maphash v0.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect

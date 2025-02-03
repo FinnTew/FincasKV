@@ -1,4 +1,4 @@
-package database
+package config
 
 import (
 	"github.com/fsnotify/fsnotify"
@@ -51,7 +51,7 @@ var (
 	mu       sync.RWMutex
 )
 
-func GetConf() *Config {
+func Get() *Config {
 	mu.RLock()
 	defer mu.RUnlock()
 	return conf
@@ -82,7 +82,7 @@ func loadConfig(v *viper.Viper) *Config {
 	return cfg
 }
 
-func InitConf(configPath string) error {
+func Init(configPath string) error {
 	var initErr error
 	confOnce.Do(func() {
 		v := viper.New()

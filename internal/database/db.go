@@ -1,6 +1,7 @@
 package database
 
 import (
+	"github.com/FinnTew/FincasKV/internal/config"
 	"github.com/FinnTew/FincasKV/internal/database/redis"
 	"github.com/FinnTew/FincasKV/internal/storage"
 	"log"
@@ -16,7 +17,7 @@ type FincasDB struct {
 
 func NewFincasDB() *FincasDB {
 	var bcOpts []storage.Option
-	conf := GetConf()
+	conf := config.Get()
 
 	if conf.Base.DataDir != "" {
 		bcOpts = append(bcOpts, storage.WithDataDir(conf.Base.DataDir))
