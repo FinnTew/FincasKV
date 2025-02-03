@@ -17,14 +17,15 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [x] ShardMemIndex
   - [x] MemCache(implement LRUCache only)
   - [x] Use BloomFilter
-- [ ] DB
+- [x] DB
   - [x] Put With TTL
   - [x] Batch Operation
-  - [ ] Redis DataStructure: Plan to implemented by the way of multi-key
+  - [x] Redis DataStructure
     - [x] String
-    - [ ] List
+    - [x] List
     - [x] Hash
-    - [ ] Set
-    - [ ] ZSet
-- [ ] Network & Supported RESP
+    - [x] Set
+    - [x] ZSet
+  - [x] FincasKV DB
+- [ ] Network
 - [ ] Raft
