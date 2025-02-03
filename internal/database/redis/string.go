@@ -21,8 +21,10 @@ var stringPool = sync.Pool{
 	},
 }
 
-func NewRString() *RString {
-	return stringPool.Get().(*RString)
+func NewRString(dw *DBWrapper) *RString {
+	rs := stringPool.Get().(*RString)
+	rs.dw = dw
+	return rs
 }
 
 func (rs *RString) Release() {

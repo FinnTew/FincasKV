@@ -2,10 +2,7 @@ package redis
 
 import (
 	"fmt"
-	"github.com/FinnTew/FincasKV/internal/database/base"
-	"github.com/FinnTew/FincasKV/internal/storage"
 	"math"
-	"sync"
 )
 
 var (
@@ -68,24 +65,4 @@ func float64ToOrderedString(score float64) string {
 		bits = bits | (1 << 63)
 	}
 	return fmt.Sprintf("%016x", bits)
-}
-
-var bitcaskOpts = []storage.Option{
-	storage.WithDataDir("./fincas"),
-}
-
-type DBWrapper struct {
-	db     *base.BaseDB
-	dbOnce sync.Once
-}
-
-func (d *DBWrapper) GetDB() *base.BaseDB {
-	d.dbOnce.Do(func() {
-		d.db, _ = base.NewDB(
-			base.DefaultBaseDBOptions(),
-			bitcaskOpts...,
-		)
-	})
-
-	return d.db
 }

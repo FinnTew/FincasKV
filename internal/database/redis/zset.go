@@ -28,8 +28,14 @@ var zsetPool = sync.Pool{
 	},
 }
 
-func NewRZSet() *RZSet {
-	return zsetPool.Get().(*RZSet)
+func NewRZSet(dw *DBWrapper) *RZSet {
+	rz := zsetPool.Get().(*RZSet)
+	rz.dw = dw
+	return rz
+}
+
+func (z *RZSet) Release() {
+	zsetPool.Put(z)
 }
 
 func (z *RZSet) getKeyExists(key string) (bool, error) {

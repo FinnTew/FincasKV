@@ -44,7 +44,7 @@ type operation struct {
 }
 
 type WriteBatch struct {
-	db         *BaseDB
+	db         *DB
 	operations []operation
 	mu         sync.Mutex
 	committed  bool

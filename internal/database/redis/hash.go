@@ -15,21 +15,20 @@ type RHash struct {
 
 var hashPool = sync.Pool{
 	New: func() interface{} {
-		return &RHash{
-			dw: &DBWrapper{},
-		}
+		return &RHash{}
 	},
 }
 
-func NewRHash() *RHash {
-	return hashPool.Get().(*RHash)
+func NewRHash(dw *DBWrapper) *RHash {
+	rh := hashPool.Get().(*RHash)
+	rh.dw = dw
+	return rh
 }
 
 func (rh *RHash) Release() {
 	hashPool.Put(rh)
 }
 
-// batchSetFields 批量设置哈希字段
 func (rh *RHash) batchSetFields(key string, fields map[string]string, nx bool) error {
 	if len(key) == 0 {
 		return err_def.ErrEmptyKey
@@ -41,7 +40,6 @@ func (rh *RHash) batchSetFields(key string, fields map[string]string, nx bool) e
 	wb := rh.dw.GetDB().NewWriteBatch(nil)
 	defer wb.Release()
 
-	// 获取当前hash长度
 	lenKey := GetHashLenKey(key)
 	currentLen, err := rh.HLen(key)
 	if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
@@ -289,12 +287,10 @@ func (rh *RHash) HIncrBy(key, field string, incr int64) (int64, error) {
 		if !errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, err
 		}
-		// Key不存在时设置初始值
 		if err := wb.Put(hashKey, strconv.FormatInt(incr, 10)); err != nil {
 			return 0, err
 		}
 
-		// 更新长度
 		if err := wb.Put(GetHashLenKey(key), "1"); err != nil {
 			return 0, err
 		}
@@ -336,12 +332,10 @@ func (rh *RHash) HIncrByFloat(key, field string, incr float64) (float64, error) 
 		if !errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, err
 		}
-		// Key不存在时设置初始值
 		if err := wb.Put(hashKey, strconv.FormatFloat(incr, 'f', -1, 64)); err != nil {
 			return 0, err
 		}
 
-		// 更新长度
 		if err := wb.Put(GetHashLenKey(key), "1"); err != nil {
 			return 0, err
 		}

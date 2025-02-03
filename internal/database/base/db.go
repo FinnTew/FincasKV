@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type BaseDB struct {
+type DB struct {
 	bc *bitcask.Bitcask
 
 	expireMap map[string]time.Time
@@ -32,7 +32,7 @@ type BaseDB struct {
 	dbOpts *BaseDBOptions
 }
 
-func NewDB(dbOpts *BaseDBOptions, bcOpts ...storage.Option) (*BaseDB, error) {
+func NewDB(dbOpts *BaseDBOptions, bcOpts ...storage.Option) (*DB, error) {
 	if dbOpts == nil {
 		dbOpts = DefaultBaseDBOptions()
 	}
@@ -42,7 +42,7 @@ func NewDB(dbOpts *BaseDBOptions, bcOpts ...storage.Option) (*BaseDB, error) {
 		return nil, fmt.Errorf("failed to open bitcask: %w", err)
 	}
 
-	db := &BaseDB{
+	db := &DB{
 		bc:        bc,
 		expireMap: make(map[string]time.Time),
 		closeCh:   make(chan struct{}),
@@ -65,11 +65,11 @@ func NewDB(dbOpts *BaseDBOptions, bcOpts ...storage.Option) (*BaseDB, error) {
 	return db, nil
 }
 
-func (db *BaseDB) Put(key string, value string) error {
+func (db *DB) Put(key string, value string) error {
 	return db.bc.Put(key, []byte(value))
 }
 
-func (db *BaseDB) Get(key string) (string, error) {
+func (db *DB) Get(key string) (string, error) {
 	if db.isExpired(key) {
 		_ = db.deleteExpiredKey(key)
 		return "", err_def.ErrKeyNotFound
@@ -82,11 +82,11 @@ func (db *BaseDB) Get(key string) (string, error) {
 	return string(val), nil
 }
 
-func (db *BaseDB) Del(key string) error {
+func (db *DB) Del(key string) error {
 	return db.bc.Del(key)
 }
 
-func (db *BaseDB) Close() {
+func (db *DB) Close() {
 	close(db.closeCh)
 	db.wg.Wait()
 
@@ -95,7 +95,7 @@ func (db *BaseDB) Close() {
 	_ = db.bc.Close()
 }
 
-func (db *BaseDB) Exists(key string) (bool, error) {
+func (db *DB) Exists(key string) (bool, error) {
 	if db.isExpired(key) {
 		_ = db.deleteExpiredKey(key)
 		return false, nil
@@ -115,7 +115,7 @@ func (db *BaseDB) Exists(key string) (bool, error) {
 	return true, nil
 }
 
-func (db *BaseDB) Expire(key string, ttl time.Duration) error {
+func (db *DB) Expire(key string, ttl time.Duration) error {
 	if ttl <= 0 {
 		return fmt.Errorf("invalid TTL: %v", ttl)
 	}
@@ -140,7 +140,7 @@ func (db *BaseDB) Expire(key string, ttl time.Duration) error {
 	return nil
 }
 
-func (db *BaseDB) Keys(pattern string) ([]string, error) {
+func (db *DB) Keys(pattern string) ([]string, error) {
 	allKeys, err := db.bc.ListKeys()
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (db *BaseDB) Keys(pattern string) ([]string, error) {
 	return results, nil
 }
 
-func (db *BaseDB) Type(key string) (string, error) {
+func (db *DB) Type(key string) (string, error) {
 	if db.isExpired(key) {
 		_ = db.deleteExpiredKey(key)
 		return "none", nil
@@ -205,7 +205,7 @@ func (db *BaseDB) Type(key string) (string, error) {
 	return "string", nil
 }
 
-func (db *BaseDB) Persist(key string) error {
+func (db *DB) Persist(key string) error {
 	ex, err := db.Exists(key)
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func (db *BaseDB) Persist(key string) error {
 	return nil
 }
 
-func (db *BaseDB) NewWriteBatch(opts *BatchOptions) *WriteBatch {
+func (db *DB) NewWriteBatch(opts *BatchOptions) *WriteBatch {
 	if opts == nil {
 		opts = DefaultBatchOptions()
 	}
@@ -238,7 +238,7 @@ func (db *BaseDB) NewWriteBatch(opts *BatchOptions) *WriteBatch {
 	return wb
 }
 
-func (db *BaseDB) expirationWorker(interval time.Duration) {
+func (db *DB) expirationWorker(interval time.Duration) {
 	defer db.wg.Done()
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -260,7 +260,7 @@ func (db *BaseDB) expirationWorker(interval time.Duration) {
 	}
 }
 
-func (db *BaseDB) evictExpiredKeys() {
+func (db *DB) evictExpiredKeys() {
 	now := time.Now()
 	db.expireMu.Lock()
 	defer db.expireMu.Unlock()
@@ -274,14 +274,14 @@ func (db *BaseDB) evictExpiredKeys() {
 	}
 }
 
-func (db *BaseDB) isExpired(key string) bool {
+func (db *DB) isExpired(key string) bool {
 	db.expireMu.RLock()
 	expAt, ok := db.expireMap[key]
 	db.expireMu.RUnlock()
 	return ok && time.Now().After(expAt)
 }
 
-func (db *BaseDB) deleteExpiredKey(key string) error {
+func (db *DB) deleteExpiredKey(key string) error {
 	err := db.bc.Del(key)
 	db.expireMu.Lock()
 	delete(db.expireMap, key)
@@ -294,7 +294,7 @@ func (db *BaseDB) deleteExpiredKey(key string) error {
 	return err
 }
 
-func (db *BaseDB) loadTTLMetadata() error {
+func (db *DB) loadTTLMetadata() error {
 	f, err := os.Open(db.ttlPath)
 	if err != nil {
 		return err
@@ -318,7 +318,7 @@ func (db *BaseDB) loadTTLMetadata() error {
 	return scanner.Err()
 }
 
-func (db *BaseDB) saveTTLMetadata() error {
+func (db *DB) saveTTLMetadata() error {
 	tmpFile := db.ttlPath + ".tmp"
 	f, err := os.Create(tmpFile)
 	if err != nil {

@@ -16,14 +16,14 @@ type RList struct {
 
 var listPool = sync.Pool{
 	New: func() interface{} {
-		return &RList{
-			dw: &DBWrapper{},
-		}
+		return &RList{}
 	},
 }
 
-func NewRList() *RList {
-	return listPool.Get().(*RList)
+func NewRList(dw *DBWrapper) *RList {
+	rl := listPool.Get().(*RList)
+	rl.dw = dw
+	return rl
 }
 
 func (rl *RList) Release() {

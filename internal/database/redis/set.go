@@ -17,14 +17,14 @@ type RSet struct {
 
 var setPool = sync.Pool{
 	New: func() interface{} {
-		return &RSet{
-			dw: &DBWrapper{},
-		}
+		return &RSet{}
 	},
 }
 
-func NewRSet() *RSet {
-	return setPool.Get().(*RSet)
+func NewRSet(dw *DBWrapper) *RSet {
+	rs := setPool.Get().(*RSet)
+	rs.dw = dw
+	return rs
 }
 
 func (rs *RSet) Release() {
