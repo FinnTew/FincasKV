@@ -51,7 +51,7 @@ var (
 	mu       sync.RWMutex
 )
 
-func Get() *Config {
+func GetConf() *Config {
 	mu.RLock()
 	defer mu.RUnlock()
 	return conf
@@ -82,7 +82,7 @@ func loadConfig(v *viper.Viper) *Config {
 	return cfg
 }
 
-func Init(configPath string) error {
+func InitConf(configPath string) error {
 	var initErr error
 	confOnce.Do(func() {
 		v := viper.New()

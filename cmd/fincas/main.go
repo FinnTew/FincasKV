@@ -2,21 +2,21 @@ package main
 
 import (
 	"github.com/FinnTew/FincasKV/internal/database"
-	"github.com/FinnTew/FincasKV/internal/storage"
 	"log"
 )
 
 func main() {
-	db := database.NewFincasDB(
-		storage.WithDataDir("./fincas"),
-	)
-	defer db.Close()
-
-	err := db.Set("key", "value")
+	err := database.InitConf("./conf.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}
-	val, err := db.Get("key")
+
+	db := database.NewFincasDB()
+	err = db.Set("hello", "world")
+	if err != nil {
+		log.Fatal(err)
+	}
+	val, err := db.Get("hello")
 	if err != nil {
 		log.Fatal(err)
 	}
