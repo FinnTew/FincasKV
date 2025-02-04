@@ -1,5 +1,14 @@
 # FincasKV(Developing)
 
+```text
+  ______ _                     _  ____      __
+ |  ____(_)                   | |/ /\ \    / /
+ | |__   _ _ __   ___ __ _ ___| ' /  \ \  / / 
+ |  __| | | '_ \ / __/ _` / __|  <    \ \/ /  
+ | |    | | | | | (_| (_| \__ \ . \    \  /   
+ |_|    |_|_| |_|\___\__,_|___/_|\_\    \/
+```
+
 ## Description
 
 A distributed Key/Value storage based on Bitcask storage model, compatible with RESP protocol.
