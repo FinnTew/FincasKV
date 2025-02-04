@@ -42,7 +42,7 @@ func (rl *RList) getListLen(key string) (int64, error) {
 }
 
 func (rl *RList) setListLen(wb *base.WriteBatch, key string, length int64) error {
-	return wb.Put(GetListLenKey(key), strconv.FormatInt(length, 64))
+	return wb.Put(GetListLenKey(key), strconv.FormatInt(length, 10))
 }
 
 func (rl *RList) getListPointers(key string) (head, tail int64, err error) {
