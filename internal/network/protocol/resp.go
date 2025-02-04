@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 )
@@ -164,7 +165,7 @@ func (w *Writer) WriteError(err error) error {
 		return err
 	}
 
-	_, err = w.writer.Write([]byte(err.Error()))
+	_, err = w.writer.Write([]byte(fmt.Sprintf("%v", err)))
 	if err != nil {
 		return err
 	}
