@@ -27,6 +27,7 @@ func New(db *database.FincasDB) *Handler {
 
 func (h *Handler) Handle(conn *conn.Connection, cmd *protocol.Command) error {
 	switch strings.ToUpper(cmd.Name) {
+	// String commands
 	case "PING":
 		return h.handlePing(conn, cmd)
 	case "SET":
@@ -55,6 +56,37 @@ func (h *Handler) Handle(conn *conn.Connection, cmd *protocol.Command) error {
 		return h.handleMGet(conn, cmd)
 	case "STRLEN":
 		return h.handleStrLen(conn, cmd)
+	// Hash commands
+	case "HSET":
+		return h.handleHSet(conn, cmd)
+	case "HGET":
+		return h.handleHGet(conn, cmd)
+	case "HMSET":
+		return h.handleHMSet(conn, cmd)
+	case "HMGET":
+		return h.handleHMGet(conn, cmd)
+	case "HDEL":
+		return h.handleHDel(conn, cmd)
+	case "HEXISTS":
+		return h.handleHExists(conn, cmd)
+	case "HKEYS":
+		return h.handleHKeys(conn, cmd)
+	case "HVALS":
+		return h.handleHVals(conn, cmd)
+	case "HGETALL":
+		return h.handleHGetAll(conn, cmd)
+	case "HLEN":
+		return h.handleHLen(conn, cmd)
+	case "HINCRBY":
+		return h.handleHIncrBy(conn, cmd)
+	case "HINCRBYFLOAT":
+		return h.handleHIncrByFloat(conn, cmd)
+	case "HSETNX":
+		return h.handleHSetNX(conn, cmd)
+	case "HSTRLEN":
+		return h.handleHStrLen(conn, cmd)
+	// List commands
+
 	// TODO: add more cmd here
 	default:
 		return conn.WriteError(errors.New("unknown command"))
@@ -273,6 +305,244 @@ func (h *Handler) handleStrLen(conn *conn.Connection, cmd *protocol.Command) err
 	}
 
 	n, err := h.db.StrLen(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleHSet(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	err := h.db.HSet(string(cmd.Args[0]), string(cmd.Args[1]), string(cmd.Args[2]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString("OK")
+}
+
+func (h *Handler) handleHGet(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	val, err := h.db.HGet(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString(val)
+}
+
+func (h *Handler) handleHMSet(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	if (len(cmd.Args)-1)%2 != 0 {
+		return conn.WriteError(ErrSyntax)
+	}
+
+	kvPairs := make(map[string]string, (len(cmd.Args)-1)/2)
+	for i := 1; i < len(cmd.Args); i += 2 {
+		kvPairs[string(cmd.Args[i])] = string(cmd.Args[i+1])
+	}
+
+	err := h.db.HMSet(string(cmd.Args[0]), kvPairs)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString("OK")
+}
+
+func (h *Handler) handleHMGet(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	fields := make([]string, 0, len(cmd.Args))
+	for _, arg := range cmd.Args {
+		fields = append(fields, string(arg))
+	}
+
+	kvMap, err := h.db.HMGet(fields[0], fields[1:]...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for i := 1; i < len(fields); i++ {
+		res = append(res, []byte(kvMap[fields[i]]))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleHDel(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	fields := make([]string, 0, len(cmd.Args))
+	for _, arg := range cmd.Args {
+		fields = append(fields, string(arg))
+	}
+
+	n, err := h.db.HDel(fields[0], fields[1:]...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleHExists(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	ok, err := h.db.HExists(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	if ok {
+		return conn.WriteInteger(1)
+	}
+	return conn.WriteInteger(0)
+}
+
+func (h *Handler) handleHKeys(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	keys, err := h.db.HKeys(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for _, key := range keys {
+		res = append(res, []byte(key))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleHVals(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	vals, err := h.db.HVals(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for _, val := range vals {
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleHGetAll(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	kvMap, err := h.db.HGetAll(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for key, val := range kvMap {
+		res = append(res, []byte(key))
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleHLen(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.HLen(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleHIncrBy(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	val, err := strconv.ParseInt(string(cmd.Args[2]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid value %s", string(cmd.Args[2])))
+	}
+
+	n, err := h.db.HIncrBy(string(cmd.Args[0]), string(cmd.Args[1]), val)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleHIncrByFloat(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	val, err := strconv.ParseFloat(string(cmd.Args[2]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid value %s", string(cmd.Args[2])))
+	}
+
+	n, err := h.db.HIncrByFloat(string(cmd.Args[0]), string(cmd.Args[1]), val)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString(strconv.FormatFloat(n, 'f', -1, 64))
+}
+
+func (h *Handler) handleHSetNX(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	ok, err := h.db.HSetNX(string(cmd.Args[0]), string(cmd.Args[1]), string(cmd.Args[2]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	if ok {
+		return conn.WriteInteger(1)
+	}
+	return conn.WriteInteger(0)
+}
+
+func (h *Handler) handleHStrLen(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.HStrLen(string(cmd.Args[0]), string(cmd.Args[1]))
 	if err != nil {
 		return conn.WriteError(err)
 	}
