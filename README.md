@@ -35,7 +35,7 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [ ] Handle For Redis DataStructure
     - [x] String
     - [ ] List
-    - [ ] Hash
+    - [x] Hash
     - [ ] Set
     - [ ] ZSet
 - [ ] Raft
