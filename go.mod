@@ -3,18 +3,20 @@ module github.com/FinnTew/FincasKV
 go 1.23
 
 require (
+	github.com/cloudwego/netpoll v0.6.5
 	github.com/dolthub/swiss v0.2.1
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/btree v1.1.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/pkg/errors v0.9.1
+	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 )
 
 require (
 	github.com/bytedance/gopkg v0.1.0 // indirect
-	github.com/cloudwego/netpoll v0.6.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dolthub/maphash v0.1.0 // indirect
-	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -26,7 +28,6 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.19.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
