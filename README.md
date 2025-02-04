@@ -27,5 +27,10 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
     - [x] Set
     - [x] ZSet
   - [x] FincasKV DB
-- [ ] Network
+- [ ] Network (Based on CloudWeGo Netpoll)
+  - [x] TCP Conn
+  - [x] Basic RESP Protocol
+  - [x] Server
+  - [ ] Stats Record
+  - [ ] Handle For Redis DataStructure (String, List, Hash, Set, ZSet)
 - [ ] Raft
