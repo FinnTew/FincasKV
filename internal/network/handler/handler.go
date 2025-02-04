@@ -8,6 +8,7 @@ import (
 	"github.com/FinnTew/FincasKV/internal/network/protocol"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -86,7 +87,27 @@ func (h *Handler) Handle(conn *conn.Connection, cmd *protocol.Command) error {
 	case "HSTRLEN":
 		return h.handleHStrLen(conn, cmd)
 	// List commands
-
+	case "LPUSH":
+		return h.handleLPush(conn, cmd)
+	case "RPUSH":
+		return h.handleRPush(conn, cmd)
+	case "LPOP":
+		return h.handleLPop(conn, cmd)
+	case "RPOP":
+		return h.handleRPop(conn, cmd)
+	case "LLEN":
+		return h.handleLLen(conn, cmd)
+	case "LRANGE":
+		return h.handleLRange(conn, cmd)
+	case "LTRIM":
+		return h.handleLTrim(conn, cmd)
+	case "BLPOP":
+		return h.handleBLPop(conn, cmd)
+	case "BRPOP":
+		return h.handleBRPop(conn, cmd)
+	case "LINSERT":
+		return h.handleLInsert(conn, cmd)
+	//
 	// TODO: add more cmd here
 	default:
 		return conn.WriteError(errors.New("unknown command"))
@@ -543,6 +564,219 @@ func (h *Handler) handleHStrLen(conn *conn.Connection, cmd *protocol.Command) er
 	}
 
 	n, err := h.db.HStrLen(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleLPush(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	vals := []string{}
+	for _, arg := range cmd.Args[1:] {
+		vals = append(vals, string(arg))
+	}
+
+	n, err := h.db.LPush(key, vals...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleRPush(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	vals := []string{}
+	for _, arg := range cmd.Args[1:] {
+		vals = append(vals, string(arg))
+	}
+
+	n, err := h.db.RPush(key, vals...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleLPop(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	val, err := h.db.LPop(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString(val)
+}
+
+func (h *Handler) handleRPop(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	val, err := h.db.RPop(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString(val)
+}
+
+func (h *Handler) handleLLen(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.LLen(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleLRange(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	start, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid start value %s", string(cmd.Args[1])))
+	}
+	end, err := strconv.ParseInt(string(cmd.Args[2]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid end value %s", string(cmd.Args[2])))
+	}
+
+	vals, err := h.db.LRange(string(cmd.Args[0]), int(start), int(end))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for _, val := range vals {
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleLTrim(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	start, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid start value %s", string(cmd.Args[0])))
+	}
+	end, err := strconv.ParseInt(string(cmd.Args[2]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid end value %s", string(cmd.Args[1])))
+	}
+
+	err = h.db.LTrim(string(cmd.Args[2]), int(start), int(end))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString("OK")
+}
+
+func (h *Handler) handleBLPop(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	timeout, err := strconv.ParseInt(string(cmd.Args[len(cmd.Args)-1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid timeout value %s", string(cmd.Args[0])))
+	}
+
+	keys := []string{}
+	for _, arg := range cmd.Args[:len(cmd.Args)-1] {
+		keys = append(keys, string(arg))
+	}
+
+	kvMap, err := h.db.BLPop(time.Duration(timeout), keys...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for key, val := range kvMap {
+		res = append(res, []byte(key))
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleBRPop(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	timeout, err := strconv.ParseInt(string(cmd.Args[len(cmd.Args)-1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid timeout value %s", string(cmd.Args[0])))
+	}
+
+	keys := []string{}
+	for _, arg := range cmd.Args[:len(cmd.Args)-1] {
+		keys = append(keys, string(arg))
+	}
+
+	kvMap, err := h.db.BRPop(time.Duration(timeout), keys...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	res := [][]byte{}
+	for key, val := range kvMap {
+		res = append(res, []byte(key))
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleLInsert(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 4 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	before := string(cmd.Args[1])
+	pivot := string(cmd.Args[2])
+	elem := string(cmd.Args[3])
+
+	var (
+		n   int64
+		err error
+	)
+	switch strings.ToUpper(before) {
+	case "BEFORE":
+		n, err = h.db.LInsertBefore(key, pivot, elem)
+	case "AFTER":
+		n, err = h.db.LInsertAfter(key, pivot, elem)
+	default:
+		return conn.WriteError(ErrSyntax)
+	}
 	if err != nil {
 		return conn.WriteError(err)
 	}
