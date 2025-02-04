@@ -128,7 +128,6 @@ func (rh *RHash) HMGet(key string, fields ...string) (map[string]string, error) 
 					errs = append(errs, fmt.Sprintf("error getting field %s: %v", f, err))
 					mu.Unlock()
 				}
-				return
 			}
 
 			mu.Lock()
@@ -172,11 +171,11 @@ func (rh *RHash) HDel(key string, fields ...string) (int64, error) {
 	}
 
 	if deleted > 0 {
-		currentLen, err := rh.HLen(key)
+		currLen, err := rh.HLen(key)
 		if err != nil && !errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, err
 		}
-		if err := wb.Put(GetHashLenKey(key), strconv.FormatInt(currentLen-deleted, 10)); err != nil {
+		if err := wb.Put(GetHashLenKey(key), strconv.FormatInt(currLen-deleted, 10)); err != nil {
 			return 0, err
 		}
 	}
@@ -193,7 +192,15 @@ func (rh *RHash) HExists(key, field string) (bool, error) {
 		return false, err_def.ErrEmptyKey
 	}
 
-	return rh.dw.GetDB().Exists(GetHashFieldKey(key, field))
+	ok, err := rh.dw.GetDB().Exists(GetHashFieldKey(key, field))
+	if err != nil {
+		if !strings.HasPrefix(err.Error(), "no value found") {
+			return false, err
+		}
+		return false, nil
+	}
+
+	return ok, nil
 }
 
 func (rh *RHash) HKeys(key string) ([]string, error) {
