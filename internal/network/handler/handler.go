@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/FinnTew/FincasKV/internal/database"
+	"github.com/FinnTew/FincasKV/internal/database/redis"
 	"github.com/FinnTew/FincasKV/internal/network/conn"
 	"github.com/FinnTew/FincasKV/internal/network/protocol"
 	"strconv"
@@ -130,7 +131,33 @@ func (h *Handler) Handle(conn *conn.Connection, cmd *protocol.Command) error {
 		return h.handleSInter(conn, cmd)
 	case "SMOVE":
 		return h.handleSMove(conn, cmd)
-	// TODO: add more cmd here
+	// ZSet commands
+	case "ZADD":
+		return h.handleZAdd(conn, cmd)
+	case "ZRANGE":
+		return h.handleZRange(conn, cmd)
+	case "ZREVRANGE":
+		return h.handleZRevRange(conn, cmd)
+	case "ZRANK":
+		return h.handleZRank(conn, cmd)
+	case "ZREVRANK":
+		return h.handleZRevRank(conn, cmd)
+	case "ZREM":
+		return h.handleZRem(conn, cmd)
+	case "ZCARD":
+		return h.handleZCard(conn, cmd)
+	case "ZSCORE":
+		return h.handleZScore(conn, cmd)
+	case "ZINCRBY":
+		return h.handleZIncrBy(conn, cmd)
+	case "ZRANGEBYSCORE":
+		return h.handleZRangeByScore(conn, cmd)
+	case "ZCOUNT":
+		return h.handleZCount(conn, cmd)
+	case "ZREMRANGEBYRANK":
+		return h.handleZRemRangeByRank(conn, cmd)
+	case "ZREMRANGEBYSCORE":
+		return h.handleZRemRangeByScore(conn, cmd)
 	default:
 		return conn.WriteError(errors.New("unknown command"))
 	}
@@ -334,7 +361,7 @@ func (h *Handler) handleMGet(conn *conn.Connection, cmd *protocol.Command) error
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for _, key := range keys {
 		res = append(res, []byte(kvMap[key]))
 	}
@@ -418,7 +445,7 @@ func (h *Handler) handleHMGet(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for i := 1; i < len(fields); i++ {
 		res = append(res, []byte(kvMap[fields[i]]))
 	}
@@ -470,7 +497,7 @@ func (h *Handler) handleHKeys(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for _, key := range keys {
 		res = append(res, []byte(key))
 	}
@@ -488,7 +515,7 @@ func (h *Handler) handleHVals(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for _, val := range vals {
 		res = append(res, []byte(val))
 	}
@@ -506,7 +533,7 @@ func (h *Handler) handleHGetAll(conn *conn.Connection, cmd *protocol.Command) er
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for key, val := range kvMap {
 		res = append(res, []byte(key))
 		res = append(res, []byte(val))
@@ -599,7 +626,7 @@ func (h *Handler) handleLPush(conn *conn.Connection, cmd *protocol.Command) erro
 	}
 
 	key := string(cmd.Args[0])
-	vals := []string{}
+	var vals []string
 	for _, arg := range cmd.Args[1:] {
 		vals = append(vals, string(arg))
 	}
@@ -618,7 +645,7 @@ func (h *Handler) handleRPush(conn *conn.Connection, cmd *protocol.Command) erro
 	}
 
 	key := string(cmd.Args[0])
-	vals := []string{}
+	var vals []string
 	for _, arg := range cmd.Args[1:] {
 		vals = append(vals, string(arg))
 	}
@@ -689,7 +716,7 @@ func (h *Handler) handleLRange(conn *conn.Connection, cmd *protocol.Command) err
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for _, val := range vals {
 		res = append(res, []byte(val))
 	}
@@ -729,7 +756,7 @@ func (h *Handler) handleBLPop(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(fmt.Errorf("invalid timeout value %s", string(cmd.Args[0])))
 	}
 
-	keys := []string{}
+	var keys []string
 	for _, arg := range cmd.Args[:len(cmd.Args)-1] {
 		keys = append(keys, string(arg))
 	}
@@ -739,7 +766,7 @@ func (h *Handler) handleBLPop(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for key, val := range kvMap {
 		res = append(res, []byte(key))
 		res = append(res, []byte(val))
@@ -758,7 +785,7 @@ func (h *Handler) handleBRPop(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(fmt.Errorf("invalid timeout value %s", string(cmd.Args[0])))
 	}
 
-	keys := []string{}
+	var keys []string
 	for _, arg := range cmd.Args[:len(cmd.Args)-1] {
 		keys = append(keys, string(arg))
 	}
@@ -768,7 +795,7 @@ func (h *Handler) handleBRPop(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(err)
 	}
 
-	res := [][]byte{}
+	var res [][]byte
 	for key, val := range kvMap {
 		res = append(res, []byte(key))
 		res = append(res, []byte(val))
@@ -812,7 +839,7 @@ func (h *Handler) handleSAdd(conn *conn.Connection, cmd *protocol.Command) error
 	}
 
 	key := string(cmd.Args[0])
-	members := []string{}
+	var members []string
 	for _, arg := range cmd.Args[1:] {
 		members = append(members, string(arg))
 	}
@@ -831,7 +858,7 @@ func (h *Handler) handleSRem(conn *conn.Connection, cmd *protocol.Command) error
 	}
 
 	key := string(cmd.Args[0])
-	members := []string{}
+	var members []string
 	for _, arg := range cmd.Args[1:] {
 		members = append(members, string(arg))
 	}
@@ -953,7 +980,7 @@ func (h *Handler) handleSDiff(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteArray(nil)
 	}
 
-	keys := []string{}
+	var keys []string
 	for _, arg := range cmd.Args {
 		keys = append(keys, string(arg))
 	}
@@ -976,7 +1003,7 @@ func (h *Handler) handleSUnion(conn *conn.Connection, cmd *protocol.Command) err
 		return conn.WriteArray(nil)
 	}
 
-	keys := []string{}
+	var keys []string
 	for _, arg := range cmd.Args {
 		keys = append(keys, string(arg))
 	}
@@ -999,7 +1026,7 @@ func (h *Handler) handleSInter(conn *conn.Connection, cmd *protocol.Command) err
 		return conn.WriteArray(nil)
 	}
 
-	keys := []string{}
+	var keys []string
 	for _, arg := range cmd.Args {
 		keys = append(keys, string(arg))
 	}
@@ -1031,4 +1058,327 @@ func (h *Handler) handleSMove(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteInteger(1)
 	}
 	return conn.WriteInteger(0)
+}
+
+func (h *Handler) handleZAdd(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	var members []redis.ZMember
+	for i := 1; i < len(cmd.Args); i += 2 {
+		score, err := strconv.ParseFloat(string(cmd.Args[i]), 64)
+		if err != nil {
+			return conn.WriteError(fmt.Errorf("invalid score value %s", string(cmd.Args[i])))
+		}
+		members = append(members, redis.ZMember{
+			Score:  score,
+			Member: string(cmd.Args[i+1]),
+		})
+	}
+
+	n, err := h.db.ZAdd(key, members...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZRange(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 3 || len(cmd.Args) > 4 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	start, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid start value %s", string(cmd.Args[1])))
+	}
+	stop, err := strconv.ParseInt(string(cmd.Args[2]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid stop value %s", string(cmd.Args[2])))
+	}
+
+	if len(cmd.Args) == 4 {
+		if strings.ToUpper(string(cmd.Args[3])) != "WITHSCORES" {
+			return conn.WriteError(ErrSyntax)
+		} else {
+			members, err := h.db.ZRangeWithScores(key, int(start), int(stop))
+			if err != nil {
+				return conn.WriteError(err)
+			}
+			var res [][]byte
+			for _, val := range members {
+				res = append(res, []byte(val.Member))
+				res = append(res, []byte(strconv.FormatFloat(val.Score, 'f', -1, 64)))
+			}
+			return conn.WriteArray(res)
+		}
+	}
+
+	members, err := h.db.ZRange(key, int(start), int(stop))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range members {
+		res = append(res, []byte(val.Member))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleZRevRange(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 3 || len(cmd.Args) > 4 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	start, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid start value %s", string(cmd.Args[1])))
+	}
+	stop, err := strconv.ParseInt(string(cmd.Args[2]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid stop value %s", string(cmd.Args[2])))
+	}
+
+	if len(cmd.Args) == 4 {
+		if strings.ToUpper(string(cmd.Args[3])) != "WITHSCORES" {
+			return conn.WriteError(ErrSyntax)
+		} else {
+			members, err := h.db.ZRevRangeWithScores(key, int(start), int(stop))
+			if err != nil {
+				return conn.WriteError(err)
+			}
+			var res [][]byte
+			for _, val := range members {
+				res = append(res, []byte(val.Member))
+				res = append(res, []byte(strconv.FormatFloat(val.Score, 'f', -1, 64)))
+			}
+			return conn.WriteArray(res)
+		}
+	}
+
+	members, err := h.db.ZRevRange(key, int(start), int(stop))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range members {
+		res = append(res, []byte(val.Member))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleZRank(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.ZRank(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZRevRank(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.ZRevRank(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZRem(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	var members []string
+	for _, arg := range cmd.Args[1:] {
+		members = append(members, string(arg))
+	}
+
+	n, err := h.db.ZRem(key, strings.Join(members, ","))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZCard(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.ZCard(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZScore(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.ZScore(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteString(strconv.FormatFloat(n, 'f', -1, 64))
+}
+
+func (h *Handler) handleZIncrBy(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	increment, err := strconv.ParseFloat(string(cmd.Args[1]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid increment value %s", string(cmd.Args[2])))
+	}
+	member := string(cmd.Args[2])
+
+	fmt.Println(key, increment, member)
+	n, err := h.db.ZIncrBy(key, member, increment)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+	fmt.Println(n)
+
+	return conn.WriteString(strconv.FormatFloat(n, 'f', -1, 64))
+}
+
+func (h *Handler) handleZRangeByScore(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 3 || len(cmd.Args) > 4 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	minScore, err := strconv.ParseFloat(string(cmd.Args[1]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid min score value %s", string(cmd.Args[1])))
+	}
+	maxScore, err := strconv.ParseFloat(string(cmd.Args[2]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid max score value %s", string(cmd.Args[2])))
+	}
+
+	if len(cmd.Args) == 4 {
+		if strings.ToUpper(string(cmd.Args[3])) != "WITHSCORES" {
+			return conn.WriteError(ErrSyntax)
+		} else {
+			members, err := h.db.ZRangeByScoreWithScores(key, minScore, maxScore)
+			if err != nil {
+				return conn.WriteError(err)
+			}
+			var res [][]byte
+			for _, val := range members {
+				res = append(res, []byte(val.Member))
+				res = append(res, []byte(strconv.FormatFloat(val.Score, 'f', -1, 64)))
+			}
+			return conn.WriteArray(res)
+		}
+	}
+
+	members, err := h.db.ZRangeByScore(key, minScore, maxScore)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range members {
+		res = append(res, []byte(val.Member))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleZCount(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	minScore, err := strconv.ParseFloat(string(cmd.Args[1]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid min score value %s", string(cmd.Args[1])))
+	}
+	maxScore, err := strconv.ParseFloat(string(cmd.Args[2]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid max score value %s", string(cmd.Args[2])))
+	}
+
+	n, err := h.db.ZCount(key, minScore, maxScore)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZRemRangeByRank(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	start, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid start value %s", string(cmd.Args[1])))
+	}
+	stop, err := strconv.ParseInt(string(cmd.Args[2]), 10, 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid stop value %s", string(cmd.Args[2])))
+	}
+
+	n, err := h.db.ZRemRangeByRank(key, int(start), int(stop))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleZRemRangeByScore(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	minScore, err := strconv.ParseFloat(string(cmd.Args[1]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid min score value %s", string(cmd.Args[1])))
+	}
+	maxScore, err := strconv.ParseFloat(string(cmd.Args[2]), 64)
+	if err != nil {
+		return conn.WriteError(fmt.Errorf("invalid max score value %s", string(cmd.Args[2])))
+	}
+
+	n, err := h.db.ZRemRangeByScore(key, minScore, maxScore)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
 }
