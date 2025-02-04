@@ -1,17 +1,43 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/FinnTew/FincasKV/internal/config"
 	"github.com/FinnTew/FincasKV/internal/database"
 	"github.com/FinnTew/FincasKV/internal/network/server"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
+func printASCIILogo() {
+	filePath := "./ascii_logo.txt"
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	logo, err := io.ReadAll(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(logo))
+}
+
 func main() {
-	err := config.Init("./conf.yaml")
+	confPath := flag.String("conf", "./conf.yaml", "path to config file")
+	flag.Parse()
+
+	if _, err := os.Stat(*confPath); os.IsNotExist(err) {
+		log.Fatal("config file does not exist")
+	}
+
+	err := config.Init(*confPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,6 +49,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	printASCIILogo()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
