@@ -107,7 +107,29 @@ func (h *Handler) Handle(conn *conn.Connection, cmd *protocol.Command) error {
 		return h.handleBRPop(conn, cmd)
 	case "LINSERT":
 		return h.handleLInsert(conn, cmd)
-	//
+	// Set commands
+	case "SADD":
+		return h.handleSAdd(conn, cmd)
+	case "SREM":
+		return h.handleSRem(conn, cmd)
+	case "SISMEMBER":
+		return h.handleSIsMember(conn, cmd)
+	case "SMEMBERS":
+		return h.handleSMembers(conn, cmd)
+	case "SCARD":
+		return h.handleSCard(conn, cmd)
+	case "SPOP":
+		return h.handleSPop(conn, cmd)
+	case "SRANDMEMBER":
+		return h.handleSRandMember(conn, cmd)
+	case "SDIFF":
+		return h.handleSDiff(conn, cmd)
+	case "SUNION":
+		return h.handleSUnion(conn, cmd)
+	case "SINTER":
+		return h.handleSInter(conn, cmd)
+	case "SMOVE":
+		return h.handleSMove(conn, cmd)
 	// TODO: add more cmd here
 	default:
 		return conn.WriteError(errors.New("unknown command"))
@@ -782,4 +804,231 @@ func (h *Handler) handleLInsert(conn *conn.Connection, cmd *protocol.Command) er
 	}
 
 	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleSAdd(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	members := []string{}
+	for _, arg := range cmd.Args[1:] {
+		members = append(members, string(arg))
+	}
+
+	n, err := h.db.SAdd(key, members...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleSRem(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) < 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	key := string(cmd.Args[0])
+	members := []string{}
+	for _, arg := range cmd.Args[1:] {
+		members = append(members, string(arg))
+	}
+
+	n, err := h.db.SRem(key, members...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleSIsMember(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 2 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	ok, err := h.db.SIsMember(string(cmd.Args[0]), string(cmd.Args[1]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	if ok {
+		return conn.WriteInteger(1)
+	}
+	return conn.WriteInteger(0)
+}
+
+func (h *Handler) handleSMembers(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	members, err := h.db.SMembers(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, member := range members {
+		res = append(res, []byte(member))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleSCard(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 1 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	n, err := h.db.SCard(string(cmd.Args[0]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	return conn.WriteInteger(n)
+}
+
+func (h *Handler) handleSPop(conn *conn.Connection, cmd *protocol.Command) error {
+	switch len(cmd.Args) {
+	case 1:
+		val, err := h.db.SPop(string(cmd.Args[0]))
+		if err != nil {
+			return conn.WriteError(err)
+		}
+		return conn.WriteArray([][]byte{[]byte(val)})
+	case 2:
+		count, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+		if err != nil {
+			return conn.WriteError(fmt.Errorf("invalid count value %s", string(cmd.Args[1])))
+		}
+		vals, err := h.db.SPopN(string(cmd.Args[0]), int(count))
+		if err != nil {
+			return conn.WriteError(err)
+		}
+		var res [][]byte
+		for _, val := range vals {
+			res = append(res, []byte(val))
+		}
+		return conn.WriteArray(res)
+	default:
+		return conn.WriteError(ErrWrongArgCount)
+	}
+}
+
+func (h *Handler) handleSRandMember(conn *conn.Connection, cmd *protocol.Command) error {
+	var (
+		vals []string
+		err  error
+	)
+	switch len(cmd.Args) {
+	case 1:
+		vals, err = h.db.SRandMember(string(cmd.Args[0]), 1)
+	case 2:
+		count, err := strconv.ParseInt(string(cmd.Args[1]), 10, 64)
+		if err != nil {
+			return conn.WriteError(fmt.Errorf("invalid count value %s", string(cmd.Args[1])))
+		}
+		vals, err = h.db.SRandMember(string(cmd.Args[0]), int(count))
+	default:
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range vals {
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleSDiff(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) == 0 {
+		return conn.WriteArray(nil)
+	}
+
+	keys := []string{}
+	for _, arg := range cmd.Args {
+		keys = append(keys, string(arg))
+	}
+
+	vals, err := h.db.SDiff(keys...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range vals {
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleSUnion(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) == 0 {
+		return conn.WriteArray(nil)
+	}
+
+	keys := []string{}
+	for _, arg := range cmd.Args {
+		keys = append(keys, string(arg))
+	}
+
+	vals, err := h.db.SUnion(keys...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range vals {
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleSInter(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) == 0 {
+		return conn.WriteArray(nil)
+	}
+
+	keys := []string{}
+	for _, arg := range cmd.Args {
+		keys = append(keys, string(arg))
+	}
+
+	vals, err := h.db.SInter(keys...)
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	var res [][]byte
+	for _, val := range vals {
+		res = append(res, []byte(val))
+	}
+
+	return conn.WriteArray(res)
+}
+
+func (h *Handler) handleSMove(conn *conn.Connection, cmd *protocol.Command) error {
+	if len(cmd.Args) != 3 {
+		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	ok, err := h.db.SMove(string(cmd.Args[0]), string(cmd.Args[1]), string(cmd.Args[2]))
+	if err != nil {
+		return conn.WriteError(err)
+	}
+
+	if ok {
+		return conn.WriteInteger(1)
+	}
+	return conn.WriteInteger(0)
 }
