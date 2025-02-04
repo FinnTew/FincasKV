@@ -1,6 +1,13 @@
 base:
   data_dir: "./fincas"
 
+network:
+  addr: 0.0.0.0:8911
+  idle_timeout: 10s
+  max_conns: 1000
+  read_timeout: 10s
+  write_timeout: 10s
+
 mem_index:
   data_structure: swisstable
   shard_count: 256

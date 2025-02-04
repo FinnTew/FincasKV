@@ -12,6 +12,14 @@ type BaseConfig struct {
 	DataDir string
 }
 
+type NetworkConfig struct {
+	Addr         string
+	IdleTimeout  time.Duration
+	MaxConns     int
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+}
+
 type MemIndexConfig struct {
 	DataStructure         string
 	ShardCount            int
@@ -39,6 +47,7 @@ type MergeConfig struct {
 
 type Config struct {
 	Base        BaseConfig
+	Network     NetworkConfig
 	MemIndex    MemIndexConfig
 	MemCache    MemCacheConfig
 	FileManager FileManagerConfig
@@ -66,6 +75,12 @@ func loadConfig(v *viper.Viper) *Config {
 	cfg.MemIndex.ShardCount = v.GetInt("mem_index.shard_count")
 	cfg.MemIndex.BTreeDegree = v.GetInt("mem_index.btree_degree")
 	cfg.MemIndex.SwissTableInitialSize = v.GetInt("mem_index.swiss_table_initial_size")
+
+	cfg.Network.Addr = v.GetString("network.addr")
+	cfg.Network.IdleTimeout = v.GetDuration("network.idle_timeout")
+	cfg.Network.MaxConns = v.GetInt("network.max_conns")
+	cfg.Network.ReadTimeout = v.GetDuration("network.read_timeout")
+	cfg.Network.WriteTimeout = v.GetDuration("network.write_timeout")
 
 	cfg.MemCache.Enable = v.GetBool("mem_cache.enable")
 	cfg.MemCache.DataStructure = v.GetString("mem_cache.data_structure")
