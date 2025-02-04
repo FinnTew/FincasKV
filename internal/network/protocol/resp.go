@@ -160,18 +160,19 @@ func (w *Writer) WriteString(s string) error {
 }
 
 func (w *Writer) WriteError(err error) error {
-	_, err = w.writer.Write([]byte{ERROR})
-	if err != nil {
+	_, werr := w.writer.Write([]byte{ERROR})
+	if werr != nil {
 		return err
 	}
 
-	_, err = w.writer.Write([]byte(fmt.Sprintf("%v", err)))
-	if err != nil {
-		return err
+	fmt.Println(err)
+	_, werr = w.writer.Write([]byte(fmt.Sprintf("%v", err)))
+	if werr != nil {
+		return werr
 	}
 
-	_, err = w.writer.Write(CRLF)
-	return err
+	_, werr = w.writer.Write(CRLF)
+	return werr
 }
 
 func (w *Writer) WriteInteger(n int64) error {
