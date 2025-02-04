@@ -47,6 +47,12 @@ func New(conn netpoll.Connection) *Connection {
 	return c
 }
 
+func (c *Connection) Stats() Stats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return *c.stats
+}
+
 func (c *Connection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
