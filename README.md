@@ -13,6 +13,21 @@
 
 A distributed Key/Value storage based on Bitcask storage model, compatible with RESP protocol.
 
+## How To Run
+
+1. clone
+  ```bash
+  git clone https://github.com/FinnTew/FincasKV.git
+  ```
+2. mod tidy
+  ```bash
+  cd FincasKV && go mod tidy
+  ```
+3. run
+  ```bash
+  go run cmd/fincas/main.go [--conf confPath]
+  ```
+
 ## TODO
 
 - [x] Storage(Bitcask)
