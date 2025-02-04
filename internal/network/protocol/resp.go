@@ -165,7 +165,6 @@ func (w *Writer) WriteError(err error) error {
 		return err
 	}
 
-	fmt.Println(err)
 	_, werr = w.writer.Write([]byte(fmt.Sprintf("%v", err)))
 	if werr != nil {
 		return werr
