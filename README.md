@@ -32,5 +32,10 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   - [x] Basic RESP Protocol
   - [x] Server
   - [ ] Stats Record
-  - [ ] Handle For Redis DataStructure (String, List, Hash, Set, ZSet)
+  - [ ] Handle For Redis DataStructure
+    - [x] String
+    - [ ] List
+    - [ ] Hash
+    - [ ] Set
+    - [ ] ZSet
 - [ ] Raft
