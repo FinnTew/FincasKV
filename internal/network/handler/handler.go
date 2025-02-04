@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"github.com/FinnTew/FincasKV/internal/database"
 	"github.com/FinnTew/FincasKV/internal/network/conn"
 	"github.com/FinnTew/FincasKV/internal/network/protocol"
@@ -34,8 +35,12 @@ func (h *Handler) Handle(conn *conn.Connection, cmd *protocol.Command) error {
 }
 
 func (h *Handler) handlePing(conn *conn.Connection, cmd *protocol.Command) error {
-	if len(cmd.Args) != 0 {
+	if len(cmd.Args) > 1 {
 		return conn.WriteError(ErrWrongArgCount)
+	}
+
+	if len(cmd.Args) == 1 {
+		return conn.WriteString(fmt.Sprintf("PONG %s", string(cmd.Args[0])))
 	}
 
 	return conn.WriteString("PONG")
