@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"errors"
 	"fmt"
 	"github.com/FinnTew/FincasKV/internal/err_def"
 	"math/rand"
@@ -60,7 +59,7 @@ func (rs *RSet) SAdd(key string, members ...string) (int64, error) {
 	for member := range uniqueMembers {
 		memberKey := GetSetMemberKey(key, member)
 		exists, err := rs.dw.GetDB().Exists(memberKey)
-		if err != nil {
+		if err != nil && !strings.HasPrefix(err.Error(), "no value found") {
 			return 0, err
 		}
 		if !exists {
@@ -143,8 +142,14 @@ func (rs *RSet) SIsMember(key, member string) (bool, error) {
 	if len(key) == 0 {
 		return false, err_def.ErrEmptyKey
 	}
+
 	memberKey := GetSetMemberKey(key, member)
-	return rs.dw.GetDB().Exists(memberKey)
+	ok, err := rs.dw.GetDB().Exists(memberKey)
+	if err != nil && !strings.HasPrefix(err.Error(), "no value found") {
+		return false, err
+	}
+
+	return ok, nil
 }
 
 func (rs *RSet) SMembers(key string) ([]string, error) {
@@ -177,7 +182,7 @@ func (rs *RSet) SCard(key string) (int64, error) {
 
 	val, err := rs.dw.GetDB().Get(GetSetLenKey(key))
 	if err != nil {
-		if errors.Is(err, err_def.ErrKeyNotFound) {
+		if strings.HasPrefix(err.Error(), "no value found") {
 			return 0, nil
 		}
 		return 0, err
