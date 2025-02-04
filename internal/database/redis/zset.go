@@ -68,8 +68,8 @@ func (z *RZSet) ZAdd(key string, members ...ZMember) (int64, error) {
 		return 0, nil
 	}
 
-	z.zsetLock.Lock()
-	defer z.zsetLock.Unlock()
+	//z.zsetLock.Lock()
+	//defer z.zsetLock.Unlock()
 
 	wb := z.dw.GetDB().NewWriteBatch(nil)
 	defer wb.Release()
