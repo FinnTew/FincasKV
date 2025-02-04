@@ -239,7 +239,6 @@ func (rs *RString) MGet(keys ...string) (map[string]string, error) {
 					errs = append(errs, fmt.Sprintf("error getting key %s: %v", k, err))
 					mu.Unlock()
 				}
-				return
 			}
 
 			mu.Lock()
