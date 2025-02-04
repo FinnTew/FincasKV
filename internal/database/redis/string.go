@@ -45,6 +45,21 @@ func (rs *RString) Get(key string) (string, error) {
 	return rs.dw.GetDB().Get(GetStringKey(key))
 }
 
+func (rs *RString) Del(keys ...string) error {
+	if len(keys) == 0 {
+		return err_def.ErrEmptyKey
+	}
+
+	wb := rs.dw.GetDB().NewWriteBatch(nil)
+	for _, key := range keys {
+		if err := wb.Delete(GetStringKey(key)); err != nil {
+			return err
+		}
+	}
+
+	return wb.Commit()
+}
+
 func (rs *RString) Incr(key string) (int64, error) {
 	return rs.IncrBy(key, 1)
 }
