@@ -34,19 +34,19 @@ func NewRZSet(dw *DBWrapper) *RZSet {
 	return rz
 }
 
-func (z *RZSet) Release() {
-	zsetPool.Put(z)
+func (rz *RZSet) Release() {
+	zsetPool.Put(rz)
 }
 
-func (z *RZSet) getKeyExists(key string) (bool, error) {
+func (rz *RZSet) getKeyExists(key string) (bool, error) {
 	if len(key) == 0 {
 		return false, err_def.ErrEmptyKey
 	}
-	return z.dw.GetDB().Exists(GetZSetMemberScoreKey(key, ""))
+	return rz.dw.GetDB().Exists(GetZSetMemberScoreKey(key, ""))
 }
 
-func (z *RZSet) getMemberScore(key, member string) (float64, bool, error) {
-	val, err := z.dw.GetDB().Get(GetZSetMemberScoreKey(key, member))
+func (rz *RZSet) getMemberScore(key, member string) (float64, bool, error) {
+	val, err := rz.dw.GetDB().Get(GetZSetMemberScoreKey(key, member))
 	if err != nil {
 		if errors.Is(err, err_def.ErrKeyNotFound) {
 			return 0, false, nil
@@ -60,7 +60,7 @@ func (z *RZSet) getMemberScore(key, member string) (float64, bool, error) {
 	return score, true, nil
 }
 
-func (z *RZSet) ZAdd(key string, members ...ZMember) (int64, error) {
+func (rz *RZSet) ZAdd(key string, members ...ZMember) (int64, error) {
 	if len(key) == 0 {
 		return 0, err_def.ErrEmptyKey
 	}
@@ -68,10 +68,10 @@ func (z *RZSet) ZAdd(key string, members ...ZMember) (int64, error) {
 		return 0, nil
 	}
 
-	//z.zsetLock.Lock()
-	//defer z.zsetLock.Unlock()
+	//rz.zsetLock.Lock()
+	//defer rz.zsetLock.Unlock()
 
-	wb := z.dw.GetDB().NewWriteBatch(nil)
+	wb := rz.dw.GetDB().NewWriteBatch(nil)
 	defer wb.Release()
 
 	var added int64
@@ -80,7 +80,7 @@ func (z *RZSet) ZAdd(key string, members ...ZMember) (int64, error) {
 			continue
 		}
 
-		oldScore, exists, err := z.getMemberScore(key, m.Member)
+		oldScore, exists, err := rz.getMemberScore(key, m.Member)
 		if err != nil {
 			return 0, err
 		}
@@ -116,33 +116,33 @@ func (z *RZSet) ZAdd(key string, members ...ZMember) (int64, error) {
 	return added, nil
 }
 
-func (z *RZSet) ZRange(key string, start, stop int) ([]ZMember, error) {
-	return z.zrangeGeneric(key, start, stop, false, false)
+func (rz *RZSet) ZRange(key string, start, stop int) ([]ZMember, error) {
+	return rz.zrangeGeneric(key, start, stop, false, false)
 }
 
-func (z *RZSet) ZRevRange(key string, start, stop int) ([]ZMember, error) {
-	return z.zrangeGeneric(key, start, stop, true, false)
+func (rz *RZSet) ZRevRange(key string, start, stop int) ([]ZMember, error) {
+	return rz.zrangeGeneric(key, start, stop, true, false)
 }
 
-func (z *RZSet) ZRangeWithScores(key string, start, stop int) ([]ZMember, error) {
-	return z.zrangeGeneric(key, start, stop, false, true)
+func (rz *RZSet) ZRangeWithScores(key string, start, stop int) ([]ZMember, error) {
+	return rz.zrangeGeneric(key, start, stop, false, true)
 }
 
-func (z *RZSet) ZRevRangeWithScores(key string, start, stop int) ([]ZMember, error) {
-	return z.zrangeGeneric(key, start, stop, true, true)
+func (rz *RZSet) ZRevRangeWithScores(key string, start, stop int) ([]ZMember, error) {
+	return rz.zrangeGeneric(key, start, stop, true, true)
 }
 
-func (z *RZSet) zrangeGeneric(key string, start, stop int, reverse, withScores bool) ([]ZMember, error) {
+func (rz *RZSet) zrangeGeneric(key string, start, stop int, reverse, withScores bool) ([]ZMember, error) {
 	if len(key) == 0 {
 		return nil, err_def.ErrEmptyKey
 	}
 
-	z.zsetLock.RLock()
-	defer z.zsetLock.RUnlock()
+	rz.zsetLock.RLock()
+	defer rz.zsetLock.RUnlock()
 
 	// 获取所有键
 	prefix := fmt.Sprintf("%s:%s:s:", ZSetPrefix, key)
-	keys, err := z.dw.GetDB().Keys(prefix + "*")
+	keys, err := rz.dw.GetDB().Keys(prefix + "*")
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (z *RZSet) zrangeGeneric(key string, start, stop int, reverse, withScores b
 
 		member := parts[len(parts)-1]
 		if withScores {
-			score, _, err := z.getMemberScore(key, member)
+			score, _, err := rz.getMemberScore(key, member)
 			if err != nil {
 				return nil, err
 			}
@@ -196,23 +196,23 @@ func (z *RZSet) zrangeGeneric(key string, start, stop int, reverse, withScores b
 	return result, nil
 }
 
-func (z *RZSet) ZRank(key, member string) (int64, error) {
-	return z.zrankGeneric(key, member, false)
+func (rz *RZSet) ZRank(key, member string) (int64, error) {
+	return rz.zrankGeneric(key, member, false)
 }
 
-func (z *RZSet) ZRevRank(key, member string) (int64, error) {
-	return z.zrankGeneric(key, member, true)
+func (rz *RZSet) ZRevRank(key, member string) (int64, error) {
+	return rz.zrankGeneric(key, member, true)
 }
 
-func (z *RZSet) zrankGeneric(key, member string, reverse bool) (int64, error) {
+func (rz *RZSet) zrankGeneric(key, member string, reverse bool) (int64, error) {
 	if len(key) == 0 || len(member) == 0 {
 		return -1, err_def.ErrEmptyKey
 	}
 
-	z.zsetLock.RLock()
-	defer z.zsetLock.RUnlock()
+	rz.zsetLock.RLock()
+	defer rz.zsetLock.RUnlock()
 
-	score, exists, err := z.getMemberScore(key, member)
+	score, exists, err := rz.getMemberScore(key, member)
 	if err != nil {
 		return -1, err
 	}
@@ -221,7 +221,7 @@ func (z *RZSet) zrankGeneric(key, member string, reverse bool) (int64, error) {
 	}
 
 	prefix := fmt.Sprintf("%s:%s:s:", ZSetPrefix, key)
-	keys, err := z.dw.GetDB().Keys(prefix + "*")
+	keys, err := rz.dw.GetDB().Keys(prefix + "*")
 	if err != nil {
 		return -1, err
 	}
@@ -239,7 +239,7 @@ func (z *RZSet) zrankGeneric(key, member string, reverse bool) (int64, error) {
 	return int64(index), nil
 }
 
-func (z *RZSet) ZRem(key string, members ...string) (int64, error) {
+func (rz *RZSet) ZRem(key string, members ...string) (int64, error) {
 	if len(key) == 0 {
 		return 0, err_def.ErrEmptyKey
 	}
@@ -247,10 +247,10 @@ func (z *RZSet) ZRem(key string, members ...string) (int64, error) {
 		return 0, nil
 	}
 
-	z.zsetLock.Lock()
-	defer z.zsetLock.Unlock()
+	rz.zsetLock.Lock()
+	defer rz.zsetLock.Unlock()
 
-	wb := z.dw.GetDB().NewWriteBatch(nil)
+	wb := rz.dw.GetDB().NewWriteBatch(nil)
 	defer wb.Release()
 
 	var removed int64
@@ -259,7 +259,7 @@ func (z *RZSet) ZRem(key string, members ...string) (int64, error) {
 			continue
 		}
 
-		score, exists, err := z.getMemberScore(key, member)
+		score, exists, err := rz.getMemberScore(key, member)
 		if err != nil {
 			return 0, err
 		}
@@ -287,16 +287,16 @@ func (z *RZSet) ZRem(key string, members ...string) (int64, error) {
 	return removed, nil
 }
 
-func (z *RZSet) ZCard(key string) (int64, error) {
+func (rz *RZSet) ZCard(key string) (int64, error) {
 	if len(key) == 0 {
 		return 0, err_def.ErrEmptyKey
 	}
 
-	z.zsetLock.RLock()
-	defer z.zsetLock.RUnlock()
+	rz.zsetLock.RLock()
+	defer rz.zsetLock.RUnlock()
 
 	prefix := fmt.Sprintf("%s:%s:", ZSetPrefix, key)
-	keys, err := z.dw.GetDB().Keys(prefix + "*")
+	keys, err := rz.dw.GetDB().Keys(prefix + "*")
 	if err != nil {
 		return 0, err
 	}
@@ -311,15 +311,15 @@ func (z *RZSet) ZCard(key string) (int64, error) {
 	return count, nil
 }
 
-func (z *RZSet) ZScore(key, member string) (float64, error) {
+func (rz *RZSet) ZScore(key, member string) (float64, error) {
 	if len(key) == 0 || len(member) == 0 {
 		return 0, err_def.ErrEmptyKey
 	}
 
-	z.zsetLock.RLock()
-	defer z.zsetLock.RUnlock()
+	rz.zsetLock.RLock()
+	defer rz.zsetLock.RUnlock()
 
-	score, exists, err := z.getMemberScore(key, member)
+	score, exists, err := rz.getMemberScore(key, member)
 	if err != nil {
 		return 0, err
 	}
@@ -330,15 +330,15 @@ func (z *RZSet) ZScore(key, member string) (float64, error) {
 	return score, nil
 }
 
-func (z *RZSet) ZIncrBy(key, member string, increment float64) (float64, error) {
+func (rz *RZSet) ZIncrBy(key, member string, increment float64) (float64, error) {
 	if len(key) == 0 || len(member) == 0 {
 		return 0, err_def.ErrEmptyKey
 	}
 
-	z.zsetLock.Lock()
-	defer z.zsetLock.Unlock()
+	rz.zsetLock.Lock()
+	defer rz.zsetLock.Unlock()
 
-	oldScore, exists, err := z.getMemberScore(key, member)
+	oldScore, exists, err := rz.getMemberScore(key, member)
 	if err != nil {
 		return 0, err
 	}
@@ -348,7 +348,7 @@ func (z *RZSet) ZIncrBy(key, member string, increment float64) (float64, error) 
 		newScore += oldScore
 	}
 
-	_, err = z.ZAdd(key, ZMember{Member: member, Score: newScore})
+	_, err = rz.ZAdd(key, ZMember{Member: member, Score: newScore})
 	if err != nil {
 		return 0, err
 	}
@@ -356,24 +356,24 @@ func (z *RZSet) ZIncrBy(key, member string, increment float64) (float64, error) 
 	return newScore, nil
 }
 
-func (z *RZSet) ZRangeByScore(key string, min, max float64) ([]ZMember, error) {
-	return z.zrangeByScoreGeneric(key, min, max, false)
+func (rz *RZSet) ZRangeByScore(key string, min, max float64) ([]ZMember, error) {
+	return rz.zrangeByScoreGeneric(key, min, max, false)
 }
 
-func (z *RZSet) ZRangeByScoreWithScores(key string, min, max float64) ([]ZMember, error) {
-	return z.zrangeByScoreGeneric(key, min, max, true)
+func (rz *RZSet) ZRangeByScoreWithScores(key string, min, max float64) ([]ZMember, error) {
+	return rz.zrangeByScoreGeneric(key, min, max, true)
 }
 
-func (z *RZSet) zrangeByScoreGeneric(key string, min, max float64, withScores bool) ([]ZMember, error) {
+func (rz *RZSet) zrangeByScoreGeneric(key string, min, max float64, withScores bool) ([]ZMember, error) {
 	if len(key) == 0 {
 		return nil, err_def.ErrEmptyKey
 	}
 
-	z.zsetLock.RLock()
-	defer z.zsetLock.RUnlock()
+	rz.zsetLock.RLock()
+	defer rz.zsetLock.RUnlock()
 
 	prefix := fmt.Sprintf("%s:%s:s:", ZSetPrefix, key)
-	keys, err := z.dw.GetDB().Keys(prefix + "*")
+	keys, err := rz.dw.GetDB().Keys(prefix + "*")
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +386,7 @@ func (z *RZSet) zrangeByScoreGeneric(key string, min, max float64, withScores bo
 		}
 
 		member := parts[len(parts)-1]
-		score, _, err := z.getMemberScore(key, member)
+		score, _, err := rz.getMemberScore(key, member)
 		if err != nil {
 			return nil, err
 		}
@@ -410,16 +410,16 @@ func (z *RZSet) zrangeByScoreGeneric(key string, min, max float64, withScores bo
 	return result, nil
 }
 
-func (z *RZSet) ZCount(key string, min, max float64) (int64, error) {
-	members, err := z.ZRangeByScore(key, min, max)
+func (rz *RZSet) ZCount(key string, min, max float64) (int64, error) {
+	members, err := rz.ZRangeByScore(key, min, max)
 	if err != nil {
 		return 0, err
 	}
 	return int64(len(members)), nil
 }
 
-func (z *RZSet) ZRemRangeByRank(key string, start, stop int) (int64, error) {
-	members, err := z.ZRange(key, start, stop)
+func (rz *RZSet) ZRemRangeByRank(key string, start, stop int) (int64, error) {
+	members, err := rz.ZRange(key, start, stop)
 	if err != nil {
 		return 0, err
 	}
@@ -429,11 +429,11 @@ func (z *RZSet) ZRemRangeByRank(key string, start, stop int) (int64, error) {
 		membersList[i] = m.Member
 	}
 
-	return z.ZRem(key, membersList...)
+	return rz.ZRem(key, membersList...)
 }
 
-func (z *RZSet) ZRemRangeByScore(key string, min, max float64) (int64, error) {
-	members, err := z.ZRangeByScore(key, min, max)
+func (rz *RZSet) ZRemRangeByScore(key string, min, max float64) (int64, error) {
+	members, err := rz.ZRangeByScore(key, min, max)
 	if err != nil {
 		return 0, err
 	}
@@ -443,5 +443,5 @@ func (z *RZSet) ZRemRangeByScore(key string, min, max float64) (int64, error) {
 		membersList[i] = m.Member
 	}
 
-	return z.ZRem(key, membersList...)
+	return rz.ZRem(key, membersList...)
 }
