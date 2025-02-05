@@ -63,3 +63,16 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
     - [x] Set
     - [x] ZSet
 - [ ] Raft
+  - [x] FSM
+  - [x] Raft Node
+  - [x] Command Apply
+    - [x] String
+    - [x] List
+    - [x] Hash
+    - [x] Set
+    - [x] ZSet
+  - [x] Server Handle
+    - [x] INIT
+    - [x] JOIN
+    - [x] INFO
+  - [ ] Forward Write Operation To Leader
