@@ -96,7 +96,7 @@ func (c *BaseCmd) Encode() ([]byte, error) {
 	return json.Marshal(c)
 }
 
-func NewCommand(typ CmdTyp, method MethodTyp, args [][]byte) Command {
+func New(typ CmdTyp, method MethodTyp, args [][]byte) Command {
 	switch typ {
 	case CmdString:
 		return &StringCmd{
