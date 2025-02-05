@@ -4,34 +4,45 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/FinnTew/FincasKV/internal/cluster/command"
-	"github.com/FinnTew/FincasKV/internal/cluster/meta"
 	"github.com/FinnTew/FincasKV/internal/database"
 	"github.com/hashicorp/raft"
-	"sync"
+	"io"
 )
 
 type FSM struct {
-	db       *database.FincasDB
-	mu       sync.RWMutex
-	metadata *meta.Metadata
+	db *database.FincasDB
 }
 
 func New(db *database.FincasDB) *FSM {
-	return &FSM{
-		db:       db,
-		metadata: meta.New(),
-	}
+	return &FSM{db: db}
 }
 
 func (f *FSM) Apply(log *raft.Log) interface{} {
 	var cmd command.BaseCmd
 	if err := json.Unmarshal(log.Data, &cmd); err != nil {
-		return fmt.Errorf("failed to unmarshal command: %v", err)
+		return fmt.Errorf("failed to unmarshal command: %w", err)
 	}
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
 	c := command.New(cmd.GetType(), cmd.GetMethod(), cmd.Args)
-	return c.Apply(f.db)
+	if err := c.Apply(f.db); err != nil {
+		return fmt.Errorf("failed to apply command: %w", err)
+	}
+
+	return nil
 }
+
+func (f *FSM) Snapshot() (raft.FSMSnapshot, error) {
+	return &Snapshot{}, nil
+}
+
+func (f *FSM) Restore(rc io.ReadCloser) error {
+	return nil
+}
+
+type Snapshot struct{}
+
+func (s *Snapshot) Persist(sink raft.SnapshotSink) error {
+	return nil
+}
+
+func (s *Snapshot) Release() {}
