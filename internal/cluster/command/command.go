@@ -95,3 +95,50 @@ func (c *BaseCmd) GetMethod() MethodTyp {
 func (c *BaseCmd) Encode() ([]byte, error) {
 	return json.Marshal(c)
 }
+
+func NewCommand(typ CmdTyp, method MethodTyp, args [][]byte) Command {
+	switch typ {
+	case CmdString:
+		return &StringCmd{
+			BaseCmd: BaseCmd{
+				Typ:    typ,
+				Method: method,
+				Args:   args,
+			},
+		}
+	case CmdList:
+		return &ListCmd{
+			BaseCmd: BaseCmd{
+				Typ:    typ,
+				Method: method,
+				Args:   args,
+			},
+		}
+	case CmdHash:
+		return &HashCmd{
+			BaseCmd: BaseCmd{
+				Typ:    typ,
+				Method: method,
+				Args:   args,
+			},
+		}
+	case CmdSet:
+		return &SetCmd{
+			BaseCmd: BaseCmd{
+				Typ:    typ,
+				Method: method,
+				Args:   args,
+			},
+		}
+	case CmdZSet:
+		return &ZSetCmd{
+			BaseCmd: BaseCmd{
+				Typ:    typ,
+				Method: method,
+				Args:   args,
+			},
+		}
+	default:
+		return nil
+	}
+}
