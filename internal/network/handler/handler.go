@@ -738,7 +738,7 @@ func (h *Handler) handleLTrim(conn *conn.Connection, cmd *protocol.Command) erro
 		return conn.WriteError(fmt.Errorf("invalid end value %s", string(cmd.Args[1])))
 	}
 
-	err = h.db.LTrim(string(cmd.Args[2]), int(start), int(end))
+	err = h.db.LTrim(string(cmd.Args[0]), int(start), int(end))
 	if err != nil {
 		return conn.WriteError(err)
 	}
@@ -1259,7 +1259,6 @@ func (h *Handler) handleZIncrBy(conn *conn.Connection, cmd *protocol.Command) er
 	}
 	member := string(cmd.Args[2])
 
-	fmt.Println(key, increment, member)
 	n, err := h.db.ZIncrBy(key, member, increment)
 	if err != nil {
 		return conn.WriteError(err)
