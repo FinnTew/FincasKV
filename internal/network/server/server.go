@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/cluster/node"
 	"github.com/FinnTew/FincasKV/internal/config"
 	"github.com/FinnTew/FincasKV/internal/database"
 	"github.com/FinnTew/FincasKV/internal/network/conn"
 	"github.com/FinnTew/FincasKV/internal/network/handler"
 	"github.com/cloudwego/netpoll"
 	"log"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,9 +43,11 @@ type Server struct {
 
 	metricsTicker *time.Ticker
 	metricsCancel context.CancelFunc
+
+	node *node.Node
 }
 
-func New(db *database.FincasDB) (*Server, error) {
+func New(db *database.FincasDB, address *string) (*Server, error) {
 	var (
 		addr           = ":8911"
 		idleTimeout    = 5 * time.Second
@@ -52,8 +56,10 @@ func New(db *database.FincasDB) (*Server, error) {
 		writeTimeout   = 10 * time.Second
 	)
 
-	if config.Get().Network.Addr != "" {
+	if config.Get().Network.Addr != "" && *address == "" {
 		addr = config.Get().Network.Addr
+	} else if *address != "" {
+		addr = *address
 	}
 	if config.Get().Network.IdleTimeout != 0 {
 		idleTimeout = config.Get().Network.IdleTimeout * time.Second
@@ -145,6 +151,12 @@ func (s *Server) Stop() error {
 		s.metricsCancel()
 	}
 
+	if s.node != nil {
+		if err := s.node.Shutdown(); err != nil {
+			log.Printf("failed to shutdown node: %v", err)
+		}
+	}
+
 	s.conns.Range(func(key, value interface{}) bool {
 		if c, ok := value.(conn.Connection); ok {
 			c.Close()
@@ -191,9 +203,25 @@ func (s *Server) handleConnection(ctx context.Context, c netpoll.Connection) err
 				continue
 			}
 
+			// 处理 cluster 命令
+			if strings.ToUpper(cmd.Name) == "CLUSTER" {
+				if err := s.handleClusterCommand(connection, cmd); err != nil {
+					log.Printf("failed to handle cluster command: %v", err)
+				}
+				continue
+			}
+
+			// 禁止非Leader节点处理写操作
+			if isWriteCommand(cmd.Name) && s.node != nil && !s.node.IsLeader() {
+				leaderAddr := s.node
+				return connection.WriteError(fmt.Errorf("redirect to leader: %s", leaderAddr))
+			}
+
 			if err := s.handler.Handle(connection, cmd); err != nil {
 				s.stats.IncrErrorCount()
 				log.Printf("failed to handle command: %v", err)
+			} else {
+				// TODO: forward to leader
 			}
 
 			s.stats.IncrCmdCount()
@@ -245,4 +273,30 @@ func (s *Server) collectMetrics() {
 	//	totalReadBytes,
 	//	totalWriteBytes,
 	//)
+}
+
+func (s *Server) initCluster(conf *node.Config) error {
+	n, err := node.New(s.db, conf)
+	if err != nil {
+		return fmt.Errorf("failed to create node: %v", err)
+	}
+
+	s.node = n
+	return nil
+}
+
+func isWriteCommand(cmd string) bool {
+	writeCommands := map[string]bool{
+		"SET": true, "DEL": true, "INCR": true, "INCRBY": true,
+		"DECR": true, "DECRBY": true, "APPEND": true, "GETSET": true,
+		"SETNX": true, "MSET": true,
+		"HSET": true, "HMSET": true, "HDEL": true, "HINCRBY": true,
+		"HINCRBYFLOAT": true, "HSETNX": true,
+		"LPUSH": true, "RPUSH": true, "LPOP": true, "RPOP": true,
+		"LTRIM": true, "LINSERT": true,
+		"SADD": true, "SREM": true, "SPOP": true, "SMOVE": true,
+		"ZADD": true, "ZREM": true, "ZINCRBY": true,
+		"ZREMRANGEBYRANK": true, "ZREMRANGEBYSCORE": true,
+	}
+	return writeCommands[strings.ToUpper(cmd)]
 }

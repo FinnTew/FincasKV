@@ -31,6 +31,7 @@ func printASCIILogo() {
 
 func main() {
 	confPath := flag.String("conf", "./conf.yaml", "path to config file")
+	port := flag.Int("port", 8911, "port to listen on")
 	flag.Parse()
 
 	if _, err := os.Stat(*confPath); os.IsNotExist(err) {
@@ -45,7 +46,8 @@ func main() {
 	db := database.NewFincasDB()
 	defer db.Close()
 
-	srv, err := server.New(db)
+	addr := fmt.Sprintf(":%d", *port)
+	srv, err := server.New(db, &addr)
 	if err != nil {
 		log.Fatal(err)
 	}

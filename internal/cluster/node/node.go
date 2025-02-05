@@ -30,7 +30,7 @@ type Config struct {
 	Bootstrap bool
 }
 
-func NewNode(db *database.FincasDB, conf *Config) (*Node, error) {
+func New(db *database.FincasDB, conf *Config) (*Node, error) {
 	f := fsm.New(db)
 	node := &Node{
 		id:            conf.NodeID,
@@ -44,6 +44,10 @@ func NewNode(db *database.FincasDB, conf *Config) (*Node, error) {
 	}
 
 	return node, nil
+}
+
+func (n *Node) ID() string {
+	return n.id
 }
 
 func (n *Node) setupRaft() error {
@@ -152,7 +156,8 @@ func (n *Node) IsLeader() bool {
 }
 
 func (n *Node) GetLeaderAddr() string {
-	return string(n.raft.Leader())
+	addr, _ := n.raft.LeaderWithID()
+	return string(addr)
 }
 
 func (n *Node) Shutdown() error {
