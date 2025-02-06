@@ -1,5 +1,3 @@
-# FincasKV(Developing)
-
 ```text
   ______ _                     _  ____      __
  |  ____(_)                   | |/ /\ \    / /
@@ -27,6 +25,35 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   ```bash
   go run cmd/fincas/main.go [--conf confPath]
   ```
+
+## Raft Consistency Test
+
+### Node1
+
+```bash
+┌─[finntew@FinnTew-PC] - [~] - [四 2月 06, 11:59]
+└─[$] <> redis-cli -p 8911
+127.0.0.1:8911> cluster init node1 127.0.0.1:7000
+OK
+127.0.0.1:8911> cluster join node2 127.0.0.1:7001
+OK
+127.0.0.1:8911> set a bc
+OK
+127.0.0.1:8911> 
+```
+
+### Node2
+
+```bash
+┌─[finntew@FinnTew-PC] - [~] - [四 2月 06, 11:59]
+└─[$] <> redis-cli -p 8912
+127.0.0.1:8912> cluster init node2 127.0.0.1:7001
+OK
+127.0.0.1:8912> cluster info
+127.0.0.1:8912> get a
+bc
+127.0.0.1:8912> 
+```
 
 ## TODO
 
@@ -62,7 +89,7 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
     - [x] Hash
     - [x] Set
     - [x] ZSet
-- [ ] Raft
+- [x] Raft
   - [x] FSM
   - [x] Raft Node
   - [x] Command Apply
@@ -75,4 +102,4 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
     - [x] INIT
     - [x] JOIN
     - [x] INFO
-  - [ ] Forward Write Operation To Leader
+  - [x] Forward Write Operation To Leader
