@@ -89,7 +89,7 @@ bc
     - [x] Hash
     - [x] Set
     - [x] ZSet
-- [x] Raft
+- [x] Raft (Based on hashicorp/raft)
   - [x] FSM
   - [x] Raft Node
   - [x] Command Apply
