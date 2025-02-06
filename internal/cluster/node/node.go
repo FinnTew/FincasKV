@@ -134,7 +134,7 @@ func (n *Node) Join(nodeID, addr string) error {
 }
 
 func (n *Node) Apply(cmd command.Command) error {
-	if n.raft.State() != raft.Leader {
+	if !n.IsLeader() {
 		return fmt.Errorf("raft is not leader")
 	}
 
@@ -152,6 +152,7 @@ func (n *Node) Apply(cmd command.Command) error {
 }
 
 func (n *Node) IsLeader() bool {
+
 	return n.raft.State() == raft.Leader
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/FinnTew/FincasKV/internal/cluster/command"
 	"github.com/FinnTew/FincasKV/internal/cluster/node"
 	"github.com/FinnTew/FincasKV/internal/config"
 	"github.com/FinnTew/FincasKV/internal/database"
@@ -212,7 +213,8 @@ func (s *Server) handleConnection(ctx context.Context, c netpoll.Connection) err
 			}
 
 			// 禁止非Leader节点处理写操作
-			if isWriteCommand(cmd.Name) && s.node != nil && !s.node.IsLeader() {
+			cmdP, ok := isWriteCommand(cmd.Name)
+			if ok && s.node != nil && !s.node.IsLeader() {
 				leaderAddr := s.node
 				return connection.WriteError(fmt.Errorf("redirect to leader: %s", leaderAddr))
 			}
@@ -220,8 +222,11 @@ func (s *Server) handleConnection(ctx context.Context, c netpoll.Connection) err
 			if err := s.handler.Handle(connection, cmd); err != nil {
 				s.stats.IncrErrorCount()
 				log.Printf("failed to handle command: %v", err)
-			} else {
-				// TODO: forward to leader
+			} else if s.node != nil {
+				err := s.node.Apply(command.New(cmdP.CmdType, cmdP.Method, cmd.Args))
+				if err != nil {
+					return fmt.Errorf("failed to apply command: %v", err)
+				}
 			}
 
 			s.stats.IncrCmdCount()
@@ -285,18 +290,37 @@ func (s *Server) initCluster(conf *node.Config) error {
 	return nil
 }
 
-func isWriteCommand(cmd string) bool {
-	writeCommands := map[string]bool{
-		"SET": true, "DEL": true, "INCR": true, "INCRBY": true,
-		"DECR": true, "DECRBY": true, "APPEND": true, "GETSET": true,
-		"SETNX": true, "MSET": true,
-		"HSET": true, "HMSET": true, "HDEL": true, "HINCRBY": true,
-		"HINCRBYFLOAT": true, "HSETNX": true,
-		"LPUSH": true, "RPUSH": true, "LPOP": true, "RPOP": true,
-		"LTRIM": true, "LINSERT": true,
-		"SADD": true, "SREM": true, "SPOP": true, "SMOVE": true,
-		"ZADD": true, "ZREM": true, "ZINCRBY": true,
-		"ZREMRANGEBYRANK": true, "ZREMRANGEBYSCORE": true,
+type cmdPair struct {
+	CmdType command.CmdTyp
+	Method  command.MethodTyp
+}
+
+func isWriteCommand(cmd string) (cmdPair, bool) {
+	wCmds := map[string]cmdPair{
+		"SET": {command.CmdString, command.MethodSet}, "DEL": {command.CmdString, command.MethodDel}, "INCR": {command.CmdString, command.MethodIncr}, "INCRBY": {command.CmdString, command.MethodIncrBy},
+		"DECR": {command.CmdString, command.MethodDecr}, "DECRBY": {command.CmdString, command.MethodDecrBy}, "APPEND": {command.CmdString, command.MethodAppend}, "GETSET": {command.CmdString, command.MethodGetSet},
+		"SETNX": {command.CmdString, command.MethodSetNX}, "MSET": {command.CmdString, command.MethodMSet},
+		"HSET": {command.CmdHash, command.MethodHSet}, "HMSET": {command.CmdHash, command.MethodHMSet}, "HDEL": {command.CmdHash, command.MethodHDel}, "HINCRBY": {command.CmdHash, command.MethodHIncrBy},
+		"HINCRBYFLOAT": {command.CmdHash, command.MethodHIncrByFloat}, "HSETNX": {command.CmdHash, command.MethodHSetNX},
+		"LPUSH": {command.CmdList, command.MethodLPush}, "RPUSH": {command.CmdList, command.MethodRPush}, "LPOP": {command.CmdList, command.MethodLPop}, "RPOP": {command.CmdList, command.MethodRPop},
+		"LTRIM": {command.CmdList, command.MethodLTrim}, "LINSERT": {command.CmdList, command.MethodLInsert},
+		"SADD": {command.CmdSet, command.MethodSAdd}, "SREM": {command.CmdSet, command.MethodSRem}, "SPOP": {command.CmdSet, command.MethodSPop}, "SMOVE": {command.CmdSet, command.MethodSMove},
+		"ZADD": {command.CmdZSet, command.MethodZAdd}, "ZREM": {command.CmdZSet, command.MethodZRem}, "ZINCRBY": {command.CmdZSet, command.MethodZIncrBy},
+		"ZREMRANGEBYRANK": {command.CmdZSet, command.MethodZRemRangeByRank}, "ZREMRANGEBYSCORE": {command.CmdZSet, command.MethodZRemRangeByScore},
 	}
-	return writeCommands[strings.ToUpper(cmd)]
+	val, ok := wCmds[strings.ToUpper(cmd)]
+	return val, ok
+	//writeCommands := map[string]bool{
+	//	"SET": true, "DEL": true, "INCR": true, "INCRBY": true,
+	//	"DECR": true, "DECRBY": true, "APPEND": true, "GETSET": true,
+	//	"SETNX": true, "MSET": true,
+	//	"HSET": true, "HMSET": true, "HDEL": true, "HINCRBY": true,
+	//	"HINCRBYFLOAT": true, "HSETNX": true,
+	//	"LPUSH": true, "RPUSH": true, "LPOP": true, "RPOP": true,
+	//	"LTRIM": true, "LINSERT": true,
+	//	"SADD": true, "SREM": true, "SPOP": true, "SMOVE": true,
+	//	"ZADD": true, "ZREM": true, "ZINCRBY": true,
+	//	"ZREMRANGEBYRANK": true, "ZREMRANGEBYSCORE": true,
+	//}
+	//return writeCommands[strings.ToUpper(cmd)]
 }
