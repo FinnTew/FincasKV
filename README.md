@@ -23,7 +23,7 @@ A distributed Key/Value storage based on Bitcask storage model, compatible with 
   ```
 3. run
   ```bash
-  go run cmd/fincas/main.go [--conf confPath]
+  make build && ./bin/fincaskv [--conf confPath] [--port portValue]
   ```
 
 ## Raft Consistency Test
