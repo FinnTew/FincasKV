@@ -13,6 +13,12 @@ import (
 	"syscall"
 )
 
+var (
+	Version   string
+	BuildTime string
+	CommitID  string
+)
+
 func printASCIILogo() {
 	filePath := "./ascii_logo.txt"
 	file, err := os.Open(filePath)
@@ -53,6 +59,9 @@ func main() {
 	}
 
 	printASCIILogo()
+	fmt.Println("FincasKV Version: ", Version)
+	fmt.Println("Build Time: ", BuildTime)
+	fmt.Println("Commit ID: ", CommitID)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
