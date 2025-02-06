@@ -152,7 +152,6 @@ func (n *Node) Apply(cmd command.Command) error {
 }
 
 func (n *Node) IsLeader() bool {
-
 	return n.raft.State() == raft.Leader
 }
 
