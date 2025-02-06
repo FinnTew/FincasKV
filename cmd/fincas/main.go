@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/FinnTew/FincasKV/internal/config"
-	"github.com/FinnTew/FincasKV/internal/database"
-	"github.com/FinnTew/FincasKV/internal/network/server"
+	"github.com/FinnTew/FincasKV/config"
+	"github.com/FinnTew/FincasKV/database"
+	"github.com/FinnTew/FincasKV/network/server"
 	"io"
 	"log"
 	"os"
