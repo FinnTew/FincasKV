@@ -38,6 +38,7 @@ func printASCIILogo() {
 func main() {
 	confPath := flag.String("conf", "./conf.yaml", "path to config file")
 	port := flag.Int("port", 8911, "port to listen on")
+	dataDir := flag.String("dir", "./fincas", "path to data")
 	flag.Parse()
 
 	if _, err := os.Stat(*confPath); os.IsNotExist(err) {
@@ -49,7 +50,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db := database.NewFincasDB()
+	db := database.NewFincasDB(*dataDir)
 	defer db.Close()
 
 	addr := fmt.Sprintf(":%d", *port)

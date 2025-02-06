@@ -15,12 +15,14 @@ type FincasDB struct {
 	*redis2.RZSet
 }
 
-func NewFincasDB() *FincasDB {
+func NewFincasDB(dataDir string) *FincasDB {
 	var bcOpts []storage.Option
 	conf := config.Get()
 
-	if conf.Base.DataDir != "" {
+	if conf.Base.DataDir != "" && dataDir == "" {
 		bcOpts = append(bcOpts, storage.WithDataDir(conf.Base.DataDir))
+	} else if dataDir != "" {
+		bcOpts = append(bcOpts, storage.WithDataDir(dataDir))
 	}
 
 	if conf.MemIndex.DataStructure != "" {
