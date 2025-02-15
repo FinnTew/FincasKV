@@ -310,17 +310,4 @@ func isWriteCommand(cmd string) (cmdPair, bool) {
 	}
 	val, ok := wCmds[strings.ToUpper(cmd)]
 	return val, ok
-	//writeCommands := map[string]bool{
-	//	"SET": true, "DEL": true, "INCR": true, "INCRBY": true,
-	//	"DECR": true, "DECRBY": true, "APPEND": true, "GETSET": true,
-	//	"SETNX": true, "MSET": true,
-	//	"HSET": true, "HMSET": true, "HDEL": true, "HINCRBY": true,
-	//	"HINCRBYFLOAT": true, "HSETNX": true,
-	//	"LPUSH": true, "RPUSH": true, "LPOP": true, "RPOP": true,
-	//	"LTRIM": true, "LINSERT": true,
-	//	"SADD": true, "SREM": true, "SPOP": true, "SMOVE": true,
-	//	"ZADD": true, "ZREM": true, "ZINCRBY": true,
-	//	"ZREMRANGEBYRANK": true, "ZREMRANGEBYSCORE": true,
-	//}
-	//return writeCommands[strings.ToUpper(cmd)]
 }
